@@ -1,0 +1,266 @@
+import { LiteGraph } from 'litegraph.js';
+
+/**
+ * Registrasi Custom Nodes LiteGraph untuk RoboArena
+ */
+
+export function registerCustomNodes() {
+  // 1. Root Node (Titik Awal Eksekusi)
+  function RootNode() {
+    this.addOutput('Alur', 'flow');
+    this.title = '🚀 MULAI (ROOT)';
+    this.color = '#b45309';
+    this.bgcolor = '#78350f';
+    this.boxcolor = '#f59e0b';
+    this.size = [160, 48];
+    this.is_root = true;
+  }
+  RootNode.title = '🚀 Root';
+  RootNode.desc = 'Titik awal alur logika robot';
+  LiteGraph.registerNodeType('RoboArena/Root', RootNode);
+
+  // Helper untuk Node Kondisi (2 Output: YA & TIDAK)
+  function createConditionNodeClass(title, desc, color = '#0284c7', bgcolor = '#0c4a6e', boxcolor = '#38bdf8') {
+    function ConditionNode() {
+      this.addInput('in', 'flow');
+      this.addOutput('YA', 'flow');
+      this.addOutput('TIDAK', 'flow');
+      this.title = title;
+      this.color = color;
+      this.bgcolor = bgcolor;
+      this.boxcolor = boxcolor;
+      this.size = [190, 68];
+    }
+    ConditionNode.title = title;
+    ConditionNode.desc = desc;
+    return ConditionNode;
+  }
+
+  // Helper untuk Node Aksi (Terminal, Tanpa Output)
+  function createActionNodeClass(title, desc, color = '#7e22ce', bgcolor = '#581c87', boxcolor = '#c084fc') {
+    function ActionNode() {
+      this.addInput('in', 'flow');
+      this.title = title;
+      this.color = color;
+      this.bgcolor = bgcolor;
+      this.boxcolor = boxcolor;
+      this.size = [170, 48];
+    }
+    ActionNode.title = title;
+    ActionNode.desc = desc;
+    return ActionNode;
+  }
+
+  // --- CONDITION NODES DASAR ---
+  const MusuhTerlihatNode = createConditionNodeClass(
+    '👁️ Musuh Terlihat?',
+    'Cek apakah ada musuh dalam jangkauan sensor'
+  );
+  LiteGraph.registerNodeType('RoboArena/MusuhTerlihat', MusuhTerlihatNode);
+
+  function JarakMusuhKurangDariNode() {
+    this.addInput('in', 'flow');
+    this.addOutput('YA', 'flow');
+    this.addOutput('TIDAK', 'flow');
+    this.title = '📏 Jarak Musuh < X';
+    this.color = '#0284c7';
+    this.bgcolor = '#0c4a6e';
+    this.boxcolor = '#38bdf8';
+    this.properties = { jarak: 200 };
+    this.addWidget('number', 'Jarak (px)', 200, val => {
+      this.properties.jarak = Number(val);
+    }, { min: 40, max: 600, step: 10 });
+    this.size = [210, 84];
+  }
+  LiteGraph.registerNodeType('RoboArena/JarakMusuhKurangDari', JarakMusuhKurangDariNode);
+
+  function HPKurangDariNode() {
+    this.addInput('in', 'flow');
+    this.addOutput('YA', 'flow');
+    this.addOutput('TIDAK', 'flow');
+    this.title = '❤️ HP Rangka < %';
+    this.color = '#0284c7';
+    this.bgcolor = '#0c4a6e';
+    this.boxcolor = '#38bdf8';
+    this.properties = { persen: 30 };
+    this.addWidget('number', 'HP (%)', 30, val => {
+      this.properties.persen = Number(val);
+    }, { min: 5, max: 95, step: 5 });
+    this.size = [200, 84];
+  }
+  LiteGraph.registerNodeType('RoboArena/HPKurangDari', HPKurangDariNode);
+
+  const AmunisiHabisNode = createConditionNodeClass(
+    '🔋 Amunisi Habis?',
+    'Cek apakah robot kehabisan peluru'
+  );
+  LiteGraph.registerNodeType('RoboArena/AmunisiHabis', AmunisiHabisNode);
+
+  function SekutuDekatNode() {
+    this.addInput('in', 'flow');
+    this.addOutput('YA', 'flow');
+    this.addOutput('TIDAK', 'flow');
+    this.title = '🤝 Sekutu Dekat?';
+    this.color = '#0284c7';
+    this.bgcolor = '#0c4a6e';
+    this.boxcolor = '#38bdf8';
+    this.properties = { jarak: 180 };
+    this.addWidget('number', 'Jarak (px)', 180, val => {
+      this.properties.jarak = Number(val);
+    }, { min: 40, max: 500, step: 10 });
+    this.size = [200, 84];
+  }
+  LiteGraph.registerNodeType('RoboArena/SekutuDekat', SekutuDekatNode);
+
+  // --- CONDITION NODES MODUL 2 (KERUSAKAN PART) ---
+  const SenjataRusakNode = createConditionNodeClass(
+    '💥 Senjata Rusak?',
+    'Cek apakah senjata robot rusak total (HP = 0)',
+    '#b91c1c', '#7f1d1d', '#f87171'
+  );
+  LiteGraph.registerNodeType('RoboArena/SenjataRusak', SenjataRusakNode);
+
+  const PenggerakRusakNode = createConditionNodeClass(
+    '🛑 Penggerak Rusak (Lumpuh)?',
+    'Cek apakah kaki/roda robot rusak total (tidak bisa jalan)',
+    '#b91c1c', '#7f1d1d', '#f87171'
+  );
+  LiteGraph.registerNodeType('RoboArena/PenggerakRusak', PenggerakRusakNode);
+
+  const PenggerakPincangNode = createConditionNodeClass(
+    '⚠️ Penggerak Pincang?',
+    'Cek apakah HP kaki/roda di bawah 60% (jalan melambat 50%)',
+    '#d97706', '#92400e', '#fbbf24'
+  );
+  LiteGraph.registerNodeType('RoboArena/PenggerakPincang', PenggerakPincangNode);
+
+  const SensorRusakNode = createConditionNodeClass(
+    '📡 Sensor Rusak?',
+    'Cek apakah sensor rusak (radius menyusut drastis)',
+    '#d97706', '#92400e', '#fbbf24'
+  );
+  LiteGraph.registerNodeType('RoboArena/SensorRusak', SensorRusakNode);
+
+  const ArmorHabisNode = createConditionNodeClass(
+    '🛡️ Armor Habis?',
+    'Cek apakah pelindung armor tambahan sudah hancur total',
+    '#475569', '#1e293b', '#94a3b8'
+  );
+  LiteGraph.registerNodeType('RoboArena/ArmorHabis', ArmorHabisNode);
+
+  // --- CONDITION NODES MODUL 4 (KONDISI TAKTIS) ---
+  const MusuhLumpuhNode = createConditionNodeClass(
+    '🛑 Musuh Lumpuh?',
+    'Cek apakah musuh sedang mogok atau terkena pulsa EMP',
+    '#0d9488', '#115e59', '#2dd4bf'
+  );
+  LiteGraph.registerNodeType('RoboArena/MusuhLumpuh', MusuhLumpuhNode);
+
+  function HPMusuhRendahNode() {
+    this.addInput('in', 'flow');
+    this.addOutput('YA', 'flow');
+    this.addOutput('TIDAK', 'flow');
+    this.title = '🎯 HP Musuh < %';
+    this.color = '#0d9488';
+    this.bgcolor = '#115e59';
+    this.boxcolor = '#2dd4bf';
+    this.properties = { persen: 30 };
+    this.addWidget('number', 'HP (%)', 30, val => {
+      this.properties.persen = Number(val);
+    }, { min: 5, max: 95, step: 5 });
+    this.size = [200, 84];
+  }
+  LiteGraph.registerNodeType('RoboArena/HPMusuhRendah', HPMusuhRendahNode);
+
+  const TimUntungNode = createConditionNodeClass(
+    '⚖️ Tim Untung?',
+    'Cek apakah jumlah sekutu hidup lebih banyak dari musuh',
+    '#0d9488', '#115e59', '#2dd4bf'
+  );
+  LiteGraph.registerNodeType('RoboArena/TimUntung', TimUntungNode);
+
+  function WaktuHampirHabisNode() {
+    this.addInput('in', 'flow');
+    this.addOutput('YA', 'flow');
+    this.addOutput('TIDAK', 'flow');
+    this.title = '⏳ Waktu < X Detik';
+    this.color = '#0d9488';
+    this.bgcolor = '#115e59';
+    this.boxcolor = '#2dd4bf';
+    this.properties = { detik: 30 };
+    this.addWidget('number', 'Detik', 30, val => {
+      this.properties.detik = Number(val);
+    }, { min: 5, max: 90, step: 5 });
+    this.size = [200, 84];
+  }
+  LiteGraph.registerNodeType('RoboArena/WaktuHampirHabis', WaktuHampirHabisNode);
+
+  // --- ACTION NODES ---
+  const GerakKeMusuhNode = createActionNodeClass(
+    '⚔️ Gerak ke Musuh',
+    'Maju mendekati posisi musuh terdekat'
+  );
+  LiteGraph.registerNodeType('RoboArena/GerakKeMusuh', GerakKeMusuhNode);
+
+  const MundurNode = createActionNodeClass(
+    '🏃 Mundur dari Musuh',
+    'Bergerak menjauhi musuh terdekat untuk menjaga jarak'
+  );
+  LiteGraph.registerNodeType('RoboArena/Mundur', MundurNode);
+
+  const TembakNode = createActionNodeClass(
+    '🎯 Tembak',
+    'Tembakkan senjata yang terpasang ke arah musuh terdekat'
+  );
+  LiteGraph.registerNodeType('RoboArena/Tembak', TembakNode);
+
+  const DiamNode = createActionNodeClass(
+    '🛑 Diam / Bertahan',
+    'Tahan posisi di tempat, tetap hadapkan turet ke musuh'
+  );
+  LiteGraph.registerNodeType('RoboArena/Diam', DiamNode);
+
+  function GerakKeTitikNode() {
+    this.addInput('in', 'flow');
+    this.title = '📍 Gerak ke Titik';
+    this.color = '#7e22ce';
+    this.bgcolor = '#581c87';
+    this.boxcolor = '#c084fc';
+    this.properties = { x: 480, y: 320 };
+    this.addWidget('number', 'X', 480, val => {
+      this.properties.x = Number(val);
+    }, { min: 40, max: 920, step: 20 });
+    this.addWidget('number', 'Y', 320, val => {
+      this.properties.y = Number(val);
+    }, { min: 40, max: 600, step: 20 });
+    this.size = [180, 100];
+  }
+  LiteGraph.registerNodeType('RoboArena/GerakKeTitik', GerakKeTitikNode);
+
+  const IsiUlangNode = createActionNodeClass(
+    '🔄 Isi Ulang Amunisi',
+    'Mengisi kembali amunisi saat kosong'
+  );
+  LiteGraph.registerNodeType('RoboArena/IsiUlang', IsiUlangNode);
+
+  // --- ACTION NODES MODUL 4 ---
+  const TabrakNode = createActionNodeClass(
+    '💥 Tabrak Musuh',
+    'Menabrakkan diri sekuat tenaga ke musuh terdekat',
+    '#dc2626', '#991b1b', '#f87171'
+  );
+  LiteGraph.registerNodeType('RoboArena/Tabrak', TabrakNode);
+
+  const FokusMusuhTerlemahNode = createActionNodeClass(
+    '🎯 Fokus Musuh Terlemah',
+    'Memburu dan menyerang musuh dengan HP terendah dalam sensor'
+  );
+  LiteGraph.registerNodeType('RoboArena/FokusMusuhTerlemah', FokusMusuhTerlemahNode);
+
+  const LindungiSekutuNode = createActionNodeClass(
+    '🛡️ Lindungi Sekutu',
+    'Menjadi tameng di depan teman satu tim yang sekarat',
+    '#2563eb', '#1e40af', '#60a5fa'
+  );
+  LiteGraph.registerNodeType('RoboArena/LindungiSekutu', LindungiSekutuNode);
+}

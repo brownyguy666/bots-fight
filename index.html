@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RoboArena — Game Battle Robot 2D & Visual Coding</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <!-- HEADER & NAVIGATION TABS -->
+  <header class="app-header">
+    <div class="brand-logo">
+      <span class="brand-icon">🤖</span>
+      <span class="brand-name">ROBOARENA</span>
+      <span class="brand-badge">AJANG IT JILID 5</span>
+    </div>
+
+    <nav class="nav-tabs">
+      <button class="tab-btn active" data-tab="bengkel">
+        <span>🛠️</span> Bengkel Robot
+      </button>
+      <button class="tab-btn" data-tab="editor">
+        <span>🧠</span> Editor Otak
+      </button>
+      <button class="tab-btn" data-tab="arena">
+        <span>⚔️</span> Arena Simulasi
+      </button>
+      <button class="tab-btn" data-tab="turnamen">
+        <span>🏆</span> Turnamen (Nobar)
+      </button>
+    </nav>
+
+    <div class="header-tools">
+      <div class="active-bot-pill">
+        <span>Active:</span>
+        <span id="header-active-bot-name">Striker Meriam</span>
+      </div>
+      <button class="tool-icon-btn" id="btn-sound-toggle" title="Toggle Suara">🔊</button>
+      <button class="tool-icon-btn" id="btn-tutorial-trigger" title="Panduan Tutorial">❓</button>
+    </div>
+  </header>
+
+  <!-- TAB 1: BENGKEL ROBOT MODULAR -->
+  <main id="panel-bengkel" class="tab-panel active">
+    <div class="bengkel-layout">
+      <!-- Sisi Kiri: Profil & Preview 2D Live -->
+      <aside class="bengkel-sidebar">
+        <div class="bengkel-card">
+          <div class="bengkel-card-header">
+            <span class="bengkel-card-title">PROFIL ROBOT</span>
+            <select id="bengkel-select-robot" class="toolbar-select"></select>
+          </div>
+          <div style="margin-bottom: 12px;">
+            <input type="text" id="bengkel-robot-name-input" class="toolbar-select" style="width: 100%; font-size: 16px; font-weight: 700;" />
+          </div>
+          <div class="preview-canvas-wrapper" id="bengkel-preview-wrapper" style="width: 100%; height: 280px; position: relative;">
+          </div>
+        </div>
+
+        <div class="bengkel-card">
+          <div class="bengkel-card-header">
+            <span class="bengkel-card-title">STATISTIK GABUNGAN</span>
+          </div>
+          <div class="stats-grid">
+            <div class="stat-item">
+              <div class="stat-label">Total HP (Semua Part)</div>
+              <div class="stat-value" id="stat-total-hp">350</div>
+              <div class="stat-bar-bg"><div id="bar-hp" class="stat-bar-fill"></div></div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Kecepatan Efektif</div>
+              <div class="stat-value" id="stat-speed">110 px/s</div>
+              <div class="stat-bar-bg"><div id="bar-speed" class="stat-bar-fill"></div></div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Radius Radar Sensor</div>
+              <div class="stat-value" id="stat-sensor">280 px</div>
+              <div class="stat-bar-bg"><div id="bar-sensor" class="stat-bar-fill"></div></div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Reduksi Armor</div>
+              <div class="stat-value" id="stat-armor">35% Absorpsi</div>
+              <div class="stat-bar-bg"><div id="bar-armor" class="stat-bar-fill"></div></div>
+            </div>
+          </div>
+          <div style="margin-top: 14px; display: flex; flex-direction: column; gap: 8px;">
+            <button class="btn-primary" id="bengkel-btn-save" style="width: 100%;">💾 Simpan Konfigurasi</button>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn-secondary" id="bengkel-btn-new" style="flex: 1;">+ Baru</button>
+              <button class="btn-secondary" id="bengkel-btn-dup" style="flex: 1;">Duplikat</button>
+              <button class="btn-danger" id="bengkel-btn-del">Hapus</button>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Sisi Kanan: 5 Slot Part Modular -->
+      <section class="bengkel-slots-section">
+        <div style="margin-bottom: 14px;">
+          <h2 style="font-family: var(--font-display); font-size: 18px; color: var(--neon-cyan);">KUSTUMISASI SLOT BAGIAN (MODUL 2)</h2>
+          <p style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">
+            Pilih komponen terbaik untuk robotmu. Tiap bagian memiliki HP sendiri dan fungsi spesifik di medan tempur.
+          </p>
+        </div>
+        <div id="bengkel-slots-container" class="bengkel-slots-grid">
+          <!-- Diisi via JS -->
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- TAB 2: EDITOR POHON KEPUTUSAN (LITEGRAPH) -->
+  <main id="panel-editor" class="tab-panel">
+    <div class="editor-layout">
+      <!-- Toolbar Atas -->
+      <div class="editor-toolbar">
+        <div class="toolbar-group">
+          <span style="font-family: var(--font-ui); font-weight: 700; color: var(--text-muted);">Robot Aktif:</span>
+          <span id="editor-active-robot-name" style="font-family: var(--font-ui); font-weight: 700; color: var(--neon-cyan);">Striker Meriam</span>
+          <select id="select-preset-brain" class="toolbar-select"></select>
+        </div>
+        <div class="toolbar-group">
+          <button class="btn-primary" id="btn-save-brain">💾 Simpan Otak</button>
+          <button class="btn-secondary" id="btn-export-robot">📤 Ekspor (.json)</button>
+          <button class="btn-secondary" id="btn-import-robot">📥 Impor (.json)</button>
+          <input type="file" id="file-import-robot" accept=".json" style="display: none;" />
+          <button class="btn-secondary" id="btn-clear-brain">🗑️ Bersihkan</button>
+          <button class="btn-primary" id="btn-quick-test" style="background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%);">⚡ Tes Cepat (1v1)</button>
+        </div>
+      </div>
+
+      <!-- Area Utama: Palet Node & Kanvas -->
+      <div class="editor-main-area">
+        <aside class="editor-palette">
+          <div style="font-family: var(--font-display); font-size: 12px; color: var(--neon-cyan); margin-bottom: 12px; letter-spacing: 1px;">
+            PALET BLOK LOGIKA
+          </div>
+          <div id="editor-palette-list">
+            <!-- Diisi via JS -->
+          </div>
+        </aside>
+
+        <section class="editor-canvas-container" id="editor-canvas-container">
+          <canvas id="litegraph-canvas"></canvas>
+        </section>
+      </div>
+    </div>
+
+    <!-- Quick Test Drawer Melayang -->
+    <div id="quick-test-drawer" class="quick-test-drawer">
+      <div class="drawer-header">
+        <span class="drawer-title">⚡ SIMULATOR TES CEPAT 1V1 (THREE.JS 3D)</span>
+        <button id="btn-close-quick-test" class="tutorial-close-btn">&times;</button>
+      </div>
+      <div id="quick-test-three-container"></div>
+    </div>
+  </main>
+
+  <!-- TAB 3: ARENA SIMULASI MATCH (THREE.JS 3D) -->
+  <main id="panel-arena" class="tab-panel">
+    <div class="arena-layout">
+      <!-- Layar Setup Match -->
+      <div id="arena-setup-panel" class="arena-setup-card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <h2 style="font-family: var(--font-display); font-size: 18px; color: var(--neon-cyan);">PENGATURAN PERTANDINGAN (N vs N)</h2>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <span style="font-family: var(--font-ui); font-weight: 700;">Format Match:</span>
+            <select id="arena-match-size" class="toolbar-select">
+              <option value="1">1 vs 1 (Duel)</option>
+              <option value="2">2 vs 2 (Regu)</option>
+              <option value="3" selected>3 vs 3 (Pasukan)</option>
+              <option value="5">5 vs 5 (Kompi)</option>
+              <option value="8">8 vs 8 (Batalyon)</option>
+              <option value="10">10 vs 10 (Perang Akbar)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="teams-setup-grid">
+          <!-- Tim A (Biru) -->
+          <div class="team-box team-a">
+            <div class="team-title">🛡️ TIM BIRU (CYAN)</div>
+            <div id="team-a-slots" class="team-slots-list"></div>
+          </div>
+
+          <div class="vs-badge">VS</div>
+
+          <!-- Tim B (Merah) -->
+          <div class="team-box team-b">
+            <div class="team-title">⚔️ TIM MERAH (CRIMSON)</div>
+            <div id="team-b-slots" class="team-slots-list"></div>
+          </div>
+        </div>
+
+        <button class="btn-primary" id="btn-start-arena-match" style="width: 100%; font-size: 16px; padding: 12px;">
+          🚀 MULAI PERTEMPURAN ARENA (3D)
+        </button>
+      </div>
+
+      <!-- Layar Match Berjalan -->
+      <div id="arena-active-panel" style="display: none; flex-direction: column; align-items: center; gap: 10px;">
+        <div class="arena-controls-bar">
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <button class="btn-secondary" id="btn-arena-stop">⬅️ Setup Ulang</button>
+            <div style="font-family: var(--font-display); font-size: 16px; color: var(--neon-amber);">
+              ⏱️ <span id="arena-match-timer">02:00</span>
+            </div>
+          </div>
+
+          <!-- Sistem 3 Mode Kamera (Fase 12) -->
+          <div class="arena-camera-group" style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-family: var(--font-ui); font-size: 13px; font-weight: 700; color: var(--neon-cyan);">🎥 Kamera:</span>
+            <select id="arena-camera-mode-select" class="toolbar-select">
+              <option value="cinematic">Cinematic (Orbit Auto)</option>
+              <option value="thirdPerson">Third Person (Kejar)</option>
+              <option value="firstPerson">First Person (Kokpit)</option>
+            </select>
+            <select id="arena-camera-target-select" class="toolbar-select" style="display: none;"></select>
+          </div>
+
+          <div class="arena-speed-group">
+            <span style="font-family: var(--font-ui); font-size: 13px; font-weight: 700; color: var(--text-muted); align-self: center; margin-right: 6px;">Kecepatan:</span>
+            <button class="btn-speed" data-speed="0.5">0.5x</button>
+            <button class="btn-speed active" data-speed="1.0">1x</button>
+            <button class="btn-speed" data-speed="2.0">2x</button>
+            <button class="btn-speed" data-speed="4.0">4x</button>
+          </div>
+        </div>
+
+        <div class="arena-canvas-frame" id="arena-three-container"></div>
+
+        <!-- Debug Panel Modul 2 -->
+        <div class="arena-debug-bar">
+          <span class="debug-label">🔧 Panel Uji Modul 2:</span>
+          <button class="btn-secondary" id="dbg-break-weapon" style="font-size: 12px; padding: 4px 10px;">💥 Rusakkan Senjata Bot 1</button>
+          <button class="btn-secondary" id="dbg-limp" style="font-size: 12px; padding: 4px 10px;">⚠️ Pincangkan Penggerak 40%</button>
+          <button class="btn-secondary" id="dbg-paralyze" style="font-size: 12px; padding: 4px 10px;">🛑 Lumpuhkan Penggerak 0%</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- TAB 4: TURNAMEN (BRACKET NOBAR) -->
+  <main id="panel-turnamen" class="tab-panel">
+    <div id="tournament-container"></div>
+  </main>
+
+  <!-- MODAL HASIL PERTANDINGAN -->
+  <div id="match-result-modal" class="tutorial-modal-overlay">
+    <div class="tutorial-card" style="text-align: center;">
+      <div id="result-trophy-icon" style="font-size: 48px; margin-bottom: 8px;">🏆</div>
+      <h2 id="result-title" style="font-family: var(--font-display); font-size: 24px; color: var(--neon-cyan); margin-bottom: 8px;">
+        TIM BIRU MENANG!
+      </h2>
+      <p id="result-reason" style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px;">
+        Semua robot Tim Merah berhasil dihancurkan.
+      </p>
+      <div id="result-stats-list" style="margin-bottom: 20px; font-size: 13px; text-align: left; background: rgba(0,0,0,0.4); padding: 12px; border-radius: 8px;"></div>
+      <button class="btn-primary" id="btn-close-result-modal" style="width: 100%;">Tutup & Main Lagi</button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
