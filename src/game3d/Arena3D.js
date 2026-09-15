@@ -1,3 +1,4 @@
+import { animateRobot, setupRendering, disposeScene } from './visuals.js';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {
@@ -79,6 +80,7 @@ export class Arena3D {
     this.selectedRobotId = null;
     this.cinematicAngle = 0;
     this.cameraShakeIntensity = 0;
+    this.shakeOffset = new THREE.Vector3();
     this.userControlTimer = 0;
     this.defaultCameraTarget = new THREE.Vector3(0, 0, 0);
 
@@ -100,7 +102,7 @@ export class Arena3D {
     // Raycaster untuk pemilihan robot & BrainViewerPanel
     this.raycaster = new THREE.Raycaster();
     this.mouse = new THREE.Vector2();
-    this.brainViewer = new BrainViewerPanel(document.body);
+    this.brainViewer = matchConfig.quickTest ? null : new BrainViewerPanel(document.body);
     this.setupRaycasting();
 
     this.isMatchRunning = true;
@@ -138,9 +140,10 @@ export class Arena3D {
 
     if (this.quality !== 'low') {
       this.renderer.shadowMap.enabled = true;
-      this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      this.renderer.shadowMap.type = THREE.PCFShadowMap;
     }
 
+    this.environmentTarget = setupRendering(this.renderer, this.scene);
     this.container.appendChild(this.renderer.domElement);
 
     // OrbitControls untuk Third Person & Cinematic (Fase 28)
@@ -151,6 +154,7 @@ export class Arena3D {
     this.controls.minDistance = 6;
     this.controls.maxDistance = 120;
 
+    this.controls.addEventListener('end', () => { this.userControlTimer = 4; });
     this.controls.addEventListener('start', () => {
       if (this.cameraMode !== 'firstPerson') {
         this.cameraState = 'USER_CONTROL';
@@ -196,7 +200,11 @@ export class Arena3D {
       sunLight.shadow.camera.top = 40;
       sunLight.shadow.camera.bottom = -40;
     }
+    sunLight.shadow.normalBias = 0.035;
     this.scene.add(sunLight);
+    const rim = new THREE.DirectionalLight(0x75bfff, 1.7);
+    rim.position.set(-25, 18, -30);
+    this.scene.add(rim);
 
     // 2. Lantai Arena (Mesh dengan Heightmap jika tersedia) (Fase 26 & 29)
     const wWorld = this.arenaWidth * 1.5;
@@ -407,7 +415,7 @@ export class Arena3D {
     const wPos = this.toWorldCoord(xUnit, yUnit);
     const baseY = this.arenaMap.sampleHeight ? this.arenaMap.sampleHeight(xUnit, yUnit) : 0;
     mesh.position.set(wPos.x, baseY, wPos.z);
-    mesh.rotation.y = -robotState.rotation;
+    mesh.rotation.y = Math.PI / 2 - robotState.rotation;
     this.scene.add(mesh);
 
     // Mahkota Komandan (Fase 22)
@@ -505,11 +513,15 @@ export class Arena3D {
     });
 
     this.uiControlBar.querySelector('#btn-cam-zoomin').addEventListener('click', () => {
-      this.camera.position.multiplyScalar(0.85);
+      this.camera.position.sub(this.controls.target).multiplyScalar(0.85).add(this.controls.target);
+      this.cameraState = 'USER_CONTROL';
+      this.userControlTimer = 4;
     });
 
     this.uiControlBar.querySelector('#btn-cam-zoomout').addEventListener('click', () => {
-      this.camera.position.multiplyScalar(1.15);
+      this.camera.position.sub(this.controls.target).multiplyScalar(1.15).add(this.controls.target);
+      this.cameraState = 'USER_CONTROL';
+      this.userControlTimer = 4;
     });
   }
 
@@ -588,6 +600,9 @@ export class Arena3D {
     }
 
     if (!this.isMatchRunning || this.matchEnded) {
+      this.updateDebris(deltaMs / 1000);
+      this.particles.update(deltaMs / 1000);
+      this.updateDeathVisuals(deltaMs / 1000);
       this.updateCamera(deltaMs / 1000);
       this.renderer.render(this.scene, this.camera);
       return;
@@ -725,6 +740,8 @@ export class Arena3D {
     this.runSimulationTick();
     this.updateRobotsVisual(0.15);
     this.updateProjectiles(0.15);
+    this.updateDebris(0.15);
+    this.particles.update(0.15);
     this.updateHUDPositions();
     if (this.brainViewer) this.brainViewer.update();
   }
@@ -840,25 +857,12 @@ export class Arena3D {
 
   // --- UPDATE VISUAL ROBOT & FISIKA (Fase 20, 26, 27) ---
   updateRobotsVisual(deltaSec) {
+    if (deltaSec <= 0) return;
+    this.updateDeathVisuals(deltaSec);
     this.robots.forEach(r => {
       const state = r.robotState;
 
-      // Death visual animation sequence (Fase 27)
-      if (state.destroyed) {
-        if (r.deathVisualTimer !== null) {
-          r.deathVisualTimer -= deltaSec;
-          if (r.deathVisualTimer > 0) {
-            // Miring dan runtuh perlahan
-            r.mesh.rotation.z += deltaSec * 1.5;
-            r.mesh.position.y = Math.max(-0.5, r.mesh.position.y - deltaSec * 0.6);
-          } else {
-            // Hapus mesh dari scene setelah animasi ledakan selesai
-            this.scene.remove(r.mesh);
-            r.deathVisualTimer = null;
-          }
-        }
-        return;
-      }
+      if (state.destroyed) return;
 
       if (state.weaponCooldown > 0) state.weaponCooldown -= deltaSec;
 
@@ -883,14 +887,18 @@ export class Arena3D {
       while (rDiff > Math.PI) rDiff -= Math.PI * 2;
       while (rDiff < -Math.PI) rDiff += Math.PI * 2;
       const turnSpeed = calculateEffectiveTurnSpeed(state) * deltaSec;
-      state.rotation += Math.max(-turnSpeed, Math.min(turnSpeed, rDiff));
+      const turnDelta = Math.max(-turnSpeed, Math.min(turnSpeed, rDiff));
+      state.rotation += turnDelta;
 
       // Anti-Stuck heading adjustment (Fase 20)
       const adjustedRot = this.navigationSystem.adjustHeading(state.id, state.rotation);
 
       // 4. Pergerakan Maju
       const isTryingToMove = (state.targetSpeed || 0) > 0.1;
-      const currentSpeed = (state.targetSpeed || 0);
+      const desiredSpeed = Math.min(state.targetSpeed || 0, calculateEffectiveSpeed(state));
+      const oldSpeed = state.actualSpeed || 0;
+      const acceleration = desiredSpeed > oldSpeed ? 12 : 20;
+      const currentSpeed = oldSpeed + THREE.MathUtils.clamp(desiredSpeed - oldSpeed, -acceleration * deltaSec, acceleration * deltaSec);
       state.actualSpeed = currentSpeed;
 
       const prevX = state.x;
@@ -915,20 +923,16 @@ export class Arena3D {
       const wPos = this.toWorldCoord(state.x, state.y);
       let yElev = this.arenaMap.sampleHeight ? this.arenaMap.sampleHeight(state.x, state.y) : 0;
 
-      // Animasi visual penggerak (Fase 27)
-      const locoType = state.loadout?.penggerak || 'roda';
-      if (locoType === 'melayang') {
-        // Bobbing halus visual
-        yElev += Math.sin(performance.now() * 0.004 + r.walkPhase) * 0.18;
-      }
-
       r.mesh.position.set(wPos.x, yElev, wPos.z);
-      r.mesh.rotation.y = -state.rotation;
-
-      // Animasi Kaki Mekanik (fase sinus)
-      if (locoType === 'kaki' && currentSpeed > 0.5) {
-        r.walkPhase += deltaSec * currentSpeed * 2.5;
-        r.mesh.position.y = yElev + Math.abs(Math.sin(r.walkPhase)) * 0.12;
+      r.mesh.rotation.y = Math.PI / 2 - state.rotation;
+      const visibleSpeed = Math.hypot(state.x - prevX, state.y - prevY) / deltaSec;
+      animateRobot(r, deltaSec, visibleSpeed, turnDelta / deltaSec, yElev);
+      r.smokeTimer -= deltaSec;
+      const locomotion = getLocomotionState(state);
+      if (locomotion !== 'normal' && r.smokeTimer <= 0) {
+        r.smokeTimer = locomotion === 'lumpuh' ? 0.24 : 0.14;
+        if (locomotion === 'lumpuh') this.particles.emitSparks(r.mesh.position);
+        else this.particles.emitSmoke(r.mesh.position, r.mesh.rotation.y);
       }
 
       // 7. Turet 360 Derajat
@@ -958,10 +962,7 @@ export class Arena3D {
 
       if (r.mesh.turretMesh) {
         r.mesh.turretMesh.rotation.y = -(state.turretRotation - state.rotation);
-        if (r.recoilOffset > 0) {
-          r.recoilOffset = Math.max(0, r.recoilOffset - deltaSec * 1.8);
-          r.mesh.turretMesh.position.z = -r.recoilOffset;
-        }
+
       }
 
       // 8. Tembak Peluru jika Diminta
@@ -983,63 +984,50 @@ export class Arena3D {
     robotWrapper.recoilOffset = 0.35;
 
     const wData = PARTS.senjata[state.loadout?.senjata || 'meriam'];
+    robotWrapper.mesh.updateMatrixWorld(true);
+    const muzzle = robotWrapper.mesh.muzzleTip.getWorldPosition(new THREE.Vector3());
+    const muzzle2D = { x: muzzle.x / 1.5 + this.arenaWidth / 2, y: muzzle.z / 1.5 + this.arenaHeight / 2 };
     const p = new Projectile3D(
       this.scene,
-      { x: state.x, y: state.y },
+      muzzle2D,
       state.turretRotation,
       wData,
       state,
       this.toWorldCoord.bind(this),
-      { width: this.arenaWidth, height: this.arenaHeight }
+      { width: this.arenaWidth, height: this.arenaHeight },
+      { height: muzzle.y, particles: this.particles }
     );
     this.projectiles.push(p);
 
     // Muzzle flash particle
-    const wPos = this.toWorldCoord(state.x, state.y);
-    this.particles.createMuzzleFlash(wPos.x, 1.4, wPos.z, 0xffaa00);
+    this.particles.emitMuzzleFlash(muzzle, state.turretRotation, wData.bulletColor);
   }
 
   // --- UPDATE PROYEKTIL & DAMAGE (Fase 20 & 27) ---
   updateProjectiles(deltaSec) {
-    const aliveRobots = this.robots.filter(r => !r.robotState.destroyed);
-
+    if (deltaSec <= 0) return;
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const p = this.projectiles[i];
-      if (!p.active) {
-        this.projectiles.splice(i, 1);
-        continue;
-      }
-
-      const enemies = aliveRobots.filter(r => r.robotState.team !== p.shooter.team);
+      const enemies = this.robots.filter(r => !r.robotState.destroyed && r.robotState.team !== p.shooter.team);
       p.update(deltaSec, enemies, this.arenaMap.obstacles || []);
-
-      if (!p.active) {
-        this.projectiles.splice(i, 1);
-        continue;
+      if (p.hitTarget) {
+        this.applyProjectileDamage(p.hitTarget, p.damage, p.shooter);
+        p.hitTarget = null;
       }
-
-      // Cek tabrakan dengan musuh
-      for (const target of enemies) {
-        const dist = Math.hypot(target.robotState.x - p.x, target.robotState.y - p.y);
-        if (dist <= 1.4) {
-          // HIT!
-          p.destroy(true);
-          this.projectiles.splice(i, 1);
-          this.applyProjectileDamage(target, p.damage, p.shooter);
-          break;
-        }
-      }
+      if (!p.active) this.projectiles.splice(i, 1);
     }
   }
 
   applyProjectileDamage(targetWrapper, damageAmount, shooterState) {
+    if (targetWrapper.robotState.destroyed) return;
     const res = applyDamage(targetWrapper.robotState, damageAmount);
     SFX.playHit();
     targetWrapper.armorGlowTimer = 0.35;
 
     // Visual efek kena tembak
     const wPos = this.toWorldCoord(targetWrapper.robotState.x, targetWrapper.robotState.y);
-    this.particles.createSparks(wPos.x, 1.2, wPos.z);
+    this.particles.emitImpactSparks(new THREE.Vector3(wPos.x, targetWrapper.mesh.position.y + 1.2, wPos.z));
+    this.cameraShakeIntensity = Math.max(this.cameraShakeIntensity, 0.08);
 
     // Update LED visual kerusakan
     ['senjata', 'penggerak', 'sensor', 'armor'].forEach(pKey => {
@@ -1070,10 +1058,11 @@ export class Arena3D {
 
     SFX.playExplosion();
     const wPos = this.toWorldCoord(state.x, state.y);
-    this.particles.createExplosion(wPos.x, 1.5, wPos.z);
+    this.particles.emitExplosion(robotWrapper.mesh.position);
+    this.cameraShakeIntensity = 0.4;
 
     // Buat puing debris berserakan
-    const debrisList = createRobotDebrisPieces(robotWrapper.mesh, { x: wPos.x, y: 1.0, z: wPos.z });
+    const debrisList = createRobotDebrisPieces(state.loadout, state.team, robotWrapper.mesh.position);
     debrisList.forEach(d => {
       this.scene.add(d.mesh);
       this.activeDebris.push(d);
@@ -1120,87 +1109,101 @@ export class Arena3D {
     }
   }
 
-  updateDebris(deltaSec) {
+  updateDeathVisuals(dt) {
+    for (const r of this.robots) {
+      if (!r.robotState.destroyed || r.deathVisualTimer === null) continue;
+      r.deathVisualTimer -= dt;
+      r.mesh.rotation.z += dt * 0.8;
+      if (r.deathVisualTimer <= 0) {
+        r.mesh.visible = false;
+        r.deathVisualTimer = null;
+      }
+    }
+  }
+
+  updateDebris(dt) {
+    if (dt <= 0) return;
     for (let i = this.activeDebris.length - 1; i >= 0; i--) {
       const d = this.activeDebris[i];
-      d.vy -= 18 * deltaSec; // Gravitasi
-      d.mesh.position.x += d.vx * deltaSec;
-      d.mesh.position.y += d.vy * deltaSec;
-      d.mesh.position.z += d.vz * deltaSec;
-
-      d.mesh.rotation.x += d.rx * deltaSec;
-      d.mesh.rotation.y += d.ry * deltaSec;
-
-      if (d.mesh.position.y <= 0.2) {
-        d.mesh.position.y = 0.2;
-        d.vx *= 0.6;
-        d.vz *= 0.6;
-      }
-
-      d.life -= deltaSec;
-      if (d.life <= 0) {
+      d.lifetime -= dt;
+      if (d.lifetime <= 0) {
         this.scene.remove(d.mesh);
+        d.mesh.geometry.dispose();
+        d.mesh.material.dispose();
         this.activeDebris.splice(i, 1);
+        continue;
+      }
+      if (d.isGrounded) continue;
+      d.vel.y -= 18 * dt;
+      d.mesh.position.addScaledVector(d.vel, dt);
+      d.mesh.rotation.x += d.rotVel.x * dt;
+      d.mesh.rotation.y += d.rotVel.y * dt;
+      d.mesh.rotation.z += d.rotVel.z * dt;
+      const x = d.mesh.position.x / 1.5 + this.arenaWidth / 2;
+      const y = d.mesh.position.z / 1.5 + this.arenaHeight / 2;
+      const ground = (this.arenaMap.sampleHeight?.(x, y) || 0) + 0.25;
+      if (d.mesh.position.y <= ground) {
+        d.mesh.position.y = ground;
+        d.vel.y = Math.abs(d.vel.y) * 0.3;
+        d.vel.x *= 0.6; d.vel.z *= 0.6;
+        d.bounceCount++;
+        if (d.bounceCount > 2 || d.vel.y < 0.5) d.isGrounded = true;
+      }
+      d.smokeTimer -= dt;
+      if (d.smokeTimer <= 0 && d.lifetime > 13) {
+        d.smokeTimer = 0.12;
+        this.particles.emitDebrisSmoke(d.mesh.position);
       }
     }
   }
 
   // --- SISTEM KAMERA & STATE MACHINE (Fase 28) ---
-  updateCamera(deltaSec) {
-    if (this.cameraMode === 'firstPerson') {
-      const targetBot = this.robots.find(r => r.robotState.id === this.selectedRobotId && !r.robotState.destroyed) || this.robots[0];
-      if (targetBot) {
-        const wPos = this.toWorldCoord(targetBot.robotState.x, targetBot.robotState.y);
-        this.camera.position.set(wPos.x, 2.4, wPos.z);
-        const lookX = wPos.x + Math.cos(targetBot.robotState.rotation) * 15;
-        const lookZ = wPos.z + Math.sin(targetBot.robotState.rotation) * 15;
-        this.camera.lookAt(lookX, 2.0, lookZ);
-      }
+  updateCamera(dt) {
+    this.camera.position.sub(this.shakeOffset);
+    this.shakeOffset.set(0, 0, 0);
+    const alive = this.robots.filter(r => !r.robotState.destroyed);
+    const selected = alive.find(r => r.robotState.id === this.selectedRobotId) || alive[0];
+    const blend = 1 - Math.exp(-2.5 * dt);
+    if (this.cameraMode === 'firstPerson' && selected) {
+      const pos = selected.mesh.position;
+      this.camera.position.set(pos.x, pos.y + 2.6, pos.z);
+      this.camera.lookAt(pos.x + Math.cos(selected.robotState.turretRotation) * 15, pos.y + 2.1,
+        pos.z + Math.sin(selected.robotState.turretRotation) * 15);
       return;
     }
-
-    // Kamera Third Person & Cinematic dengan OrbitControls
     if (this.cameraState === 'USER_CONTROL') {
-      this.userControlTimer -= deltaSec;
-      if (this.userControlTimer <= 0) {
-        this.cameraState = 'RETURNING';
-      }
-      this.controls.update();
+      this.userControlTimer -= dt;
+      if (this.userControlTimer <= 0) this.cameraState = 'RETURNING';
+      this.controls.update(dt);
       return;
     }
-
-    let targetVec = new THREE.Vector3(0, 0, 0);
-
-    if (this.cameraMode === 'thirdPerson') {
-      const targetBot = this.robots.find(r => r.robotState.id === this.selectedRobotId && !r.robotState.destroyed) || this.robots[0];
-      if (targetBot) {
-        const wPos = this.toWorldCoord(targetBot.robotState.x, targetBot.robotState.y);
-        targetVec.set(wPos.x, 1.2, wPos.z);
-      }
+    const focus = new THREE.Vector3();
+    let radius = 12;
+    if (this.cameraMode === 'thirdPerson' && selected) {
+      focus.copy(selected.mesh.position); focus.y += 1;
+      const angle = selected.robotState.rotation;
+      this.camera.position.lerp(new THREE.Vector3(focus.x - Math.cos(angle) * 13, focus.y + 9,
+        focus.z - Math.sin(angle) * 13), blend);
     } else {
-      // Cinematic camera panning
-      this.cinematicAngle += deltaSec * 0.12;
-      const camDist = 55;
-      const targetCamX = Math.cos(this.cinematicAngle) * camDist;
-      const targetCamZ = Math.sin(this.cinematicAngle) * camDist;
-
-      if (this.cameraState === 'AUTO') {
-        this.camera.position.x += (targetCamX - this.camera.position.x) * 0.03;
-        this.camera.position.z += (targetCamZ - this.camera.position.z) * 0.03;
-        this.camera.position.y = 40;
-      }
+      for (const r of alive) focus.add(r.mesh.position);
+      if (alive.length) focus.divideScalar(alive.length);
+      for (const r of alive) radius = Math.max(radius, r.mesh.position.distanceTo(focus) + 5);
+      this.cinematicAngle += dt * 0.035;
+      const verticalFov = THREE.MathUtils.degToRad(this.camera.fov);
+      const fitFov = Math.min(verticalFov, 2 * Math.atan(Math.tan(verticalFov / 2) * this.camera.aspect));
+      const distance = Math.min(115, radius / Math.sin(fitFov / 2));
+      this.camera.position.lerp(new THREE.Vector3(focus.x + Math.cos(this.cinematicAngle) * distance * 0.7,
+        focus.y + distance * 0.7, focus.z + Math.sin(this.cinematicAngle) * distance * 0.7), blend);
     }
-
-    if (this.cameraState === 'RETURNING') {
-      this.controls.target.lerp(targetVec, 0.05);
-      if (this.controls.target.distanceTo(targetVec) < 0.5) {
-        this.cameraState = 'AUTO';
-      }
-    } else {
-      this.controls.target.copy(targetVec);
+    this.controls.target.lerp(focus, blend);
+    this.controls.update(dt);
+    this.cameraState = 'AUTO';
+    this.cameraShakeIntensity *= Math.exp(-9 * dt);
+    if (!this.simClock.isPaused && this.cameraShakeIntensity > 0.001) {
+      const t = performance.now() / 1000;
+      this.shakeOffset.set(Math.sin(t * 73), Math.cos(t * 89), 0).multiplyScalar(this.cameraShakeIntensity);
+      this.camera.position.add(this.shakeOffset);
     }
-
-    this.controls.update();
   }
 
   updateHUDPositions() {
@@ -1353,6 +1356,11 @@ export class Arena3D {
     this.container.removeEventListener('click', this.onCanvasClick);
     if (this.controls) this.controls.dispose();
     if (this.brainViewer) this.brainViewer.close();
+    this.projectiles.forEach(p => p.destroy());
+    this.particles.dispose();
+    disposeScene(this.scene);
+    this.environmentTarget?.dispose();
+    this.renderer.dispose();
     this.container.innerHTML = '';
   }
 }

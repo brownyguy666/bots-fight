@@ -1,3 +1,4 @@
+import { setupRendering, disposeScene } from '../game3d/visuals.js';
 import * as THREE from 'three';
 import { buildRobotMesh } from '../game3d/RobotBuilder.js';
 
@@ -47,6 +48,7 @@ export class RobotPreview3D {
     this.renderer.setSize(w, h);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
+    this.environmentTarget = setupRendering(this.renderer, this.scene);
     this.container.appendChild(this.renderer.domElement);
 
     // Pencahayaan showcase studio
@@ -136,13 +138,15 @@ export class RobotPreview3D {
     this.scene.add(this.currentMesh);
   }
 
-  animate() {
+  animate(now = performance.now()) {
+    const dt = Math.min(0.1, (now - (this.lastFrameTime ?? now)) / 1000);
+    this.lastFrameTime = now;
     this.animId = requestAnimationFrame(this.animate);
 
     if (this.currentMesh) {
       if (!this.isDragging) {
         // Putaran turntable otomatis lambat saat tidak di-drag
-        this.rotationY += 0.006;
+        this.rotationY += dt * 0.36;
       }
 
       this.currentMesh.rotation.y = this.rotationY;
@@ -154,6 +158,8 @@ export class RobotPreview3D {
 
   destroy() {
     cancelAnimationFrame(this.animId);
+    disposeScene(this.scene);
+    this.environmentTarget?.dispose();
     if (this.renderer) {
       this.renderer.dispose();
       if (this.renderer.domElement?.parentNode) {

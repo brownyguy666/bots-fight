@@ -10,6 +10,8 @@ import * as THREE from 'three';
 export function buildRobotMesh(loadout = {}, team = 'teamA') {
   const group = new THREE.Group();
   group.name = 'robot_root';
+  group.userData.wheels = [];
+  group.userData.legs = [];
 
   const isTeamA = team === 'teamA';
   const teamColorHex = isTeamA ? 0x00f0ff : 0xff3366;
@@ -194,6 +196,12 @@ export function buildRobotMesh(loadout = {}, team = 'teamA') {
         treadAssembly.add(rw);
       });
 
+      for (const wheel of [sprocket, idler]) {
+        wheel.userData.side = side;
+        group.userData.wheels.push(wheel);
+        const spoke = new THREE.Mesh(new THREE.BoxGeometry(treadWidth, 0.07, 0.5), rimGlowMat);
+        wheel.add(spoke);
+      }
       treadAssembly.position.x = xPos;
       return treadAssembly;
     };
@@ -230,6 +238,7 @@ export function buildRobotMesh(loadout = {}, team = 'teamA') {
       foot.castShadow = true;
       legAssembly.add(foot);
 
+      group.userData.legs.push(legAssembly);
       penggerakGroup.add(legAssembly);
     });
 
@@ -257,6 +266,7 @@ export function buildRobotMesh(loadout = {}, team = 'teamA') {
       const ringMesh = new THREE.Mesh(ringGeo, rimGlowMat);
       oGroup.add(ringMesh);
 
+      group.userData.wheels.push(oGroup);
       penggerakGroup.add(oGroup);
     });
 
@@ -313,6 +323,9 @@ export function buildRobotMesh(loadout = {}, team = 'teamA') {
       const rim = new THREE.Mesh(rimGeo, metalHubMat);
       wheelAssembly.add(rim);
 
+      const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.08, 0.62), rimGlowMat);
+      wheelAssembly.add(spoke);
+      group.userData.wheels.push(wheelAssembly);
       penggerakGroup.add(wheelAssembly);
     });
   }
@@ -723,6 +736,13 @@ export function buildRobotMesh(loadout = {}, team = 'teamA') {
   group.turretMesh = turretGroup;
   group.muzzleTip = muzzleTip;
   group.armorMaterial = armorMaterial;
+  group.userData.armorGlow = armorMaterial?.emissiveIntensity || 0;
+  group.traverse(child => {
+    if (child.isMesh) {
+      child.castShadow = true; child.receiveShadow = true;
+      child.userData.originalMaterial = child.material;
+    }
+  });
 
   return group;
 }
@@ -735,23 +755,17 @@ export function updatePartDamageVisual(robotGroup, partKey, isBroken) {
   const target = robotGroup.partsMeshes[partKey];
   if (!target) return;
 
-  const brokenMat = new THREE.MeshStandardMaterial({
-    color: 0x1e293b,
-    roughness: 0.95,
-    metalness: 0.1,
-    emissive: 0x000000
-  });
-
+  if (!!target.userData.broken === isBroken) return;
+  target.userData.broken = isBroken;
+  const previousBroken = target.userData.brokenMaterial;
+  const brokenMat = isBroken ? new THREE.MeshStandardMaterial({
+    color: 0x1e293b, roughness: 0.95, metalness: 0.1
+  }) : null;
+  target.userData.brokenMaterial = brokenMat;
   target.traverse(child => {
-    if (child.isMesh) {
-      if (isBroken) {
-        child.material = brokenMat;
-      } else {
-        const orig = robotGroup.originalMaterials.get(partKey);
-        if (orig) child.material = orig;
-      }
-    }
+    if (child.isMesh) child.material = brokenMat || child.userData.originalMaterial;
   });
+  previousBroken?.dispose();
 }
 
 /**
@@ -814,7 +828,7 @@ export function createRobotDebrisPieces(loadout = {}, team = 'teamA', worldPos =
   ];
 
   debrisConfigs.forEach((cfg) => {
-    const mesh = new THREE.Mesh(cfg.geo, cfg.mat);
+    const mesh = new THREE.Mesh(cfg.geo, cfg.mat.clone());
     mesh.castShadow = true;
     mesh.receiveShadow = true;
 
@@ -855,5 +869,7 @@ export function createRobotDebrisPieces(loadout = {}, team = 'teamA', worldPos =
     });
   });
 
+  charredMat.dispose();
+  glowingScrapMat.dispose();
   return debrisPieces;
 }
