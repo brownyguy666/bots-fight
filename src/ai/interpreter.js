@@ -100,17 +100,17 @@ export function evaluateBrain(brainJSON, robotState, gameState) {
 
       const outLinkIds = currentNode.outputs?.[slotIndex]?.links;
       if (!outLinkIds || outLinkIds.length === 0) {
-        // Cabang buntu: diam
+        // Cabang buntu: tetap aktif mendekati musuh
         finishTrace();
-        ACTIONS.Diam(robotState, gameState);
-        return 'Diam (Buntu)';
+        ACTIONS.GerakKeMusuh(robotState, gameState);
+        return 'GerakKeMusuh (Buntu)';
       }
 
       const nextLink = linkMap.get(outLinkIds[0]);
       if (!nextLink) {
         finishTrace();
-        ACTIONS.Diam(robotState, gameState);
-        return 'Diam (Link Rusak)';
+        ACTIONS.GerakKeMusuh(robotState, gameState);
+        return 'GerakKeMusuh (Link Rusak)';
       }
 
       traceLinks.push(nextLink.id);
@@ -139,8 +139,8 @@ export function evaluateBrain(brainJSON, robotState, gameState) {
     break;
   }
 
-  // Default fallback jika tidak sampai ke action
+  // Default fallback jika tidak sampai ke action: aktif bergerak mencari musuh
   finishTrace();
-  ACTIONS.Diam(robotState, gameState);
-  return 'Diam';
+  ACTIONS.GerakKeMusuh(robotState, gameState);
+  return 'GerakKeMusuh (Fallback)';
 }

@@ -10,7 +10,10 @@ import { findClosestEnemy } from './sensors.js';
 
 export function calculateEffectiveSpeed(robotState) {
   const parts = robotState.parts;
-  const baseSpeed = BALANCE.ARENA.BASE_ROBOT_SPEED;
+  let baseSpeed = BALANCE.ARENA.BASE_ROBOT_SPEED;
+  if (baseSpeed > 20) {
+    baseSpeed = baseSpeed / 16;
+  }
 
   // Modifier part
   const rMod = parts?.rangka?.speedModifier || 0;
@@ -103,14 +106,27 @@ export const ACTIONS = {
 
   // 5. Tembak
   Tembak(robotState, gameState) {
-    if (isWeaponBroken(robotState)) {
+    if (isWeaponBroken(robotState) || robotState.currentAmmo <= 0) {
       robotState.brokenWeaponAttempt = true;
+      // Jika senjata rusak atau amunisi habis, gunakan body ramming!
+      ACTIONS.Tabrak(robotState, gameState);
       return;
     }
 
     const closest = findClosestEnemy(robotState, gameState);
     if (closest) {
       robotState.targetRotation = Math.atan2(closest.dy, closest.dx);
+      // Jika jarak musuh lebih jauh dari jangkauan efektif senjata, maju mendekat sambil menembak
+      let weaponRange = robotState.parts?.senjata?.range || 350;
+      if (weaponRange > 60) weaponRange = weaponRange / 16;
+      if (closest.dist > weaponRange * 0.8) {
+        robotState.targetSpeed = calculateEffectiveSpeed(robotState) * 0.85;
+      } else {
+        // Dalam jangkauan tembak: tetap bergerak taktis agar tidak statis
+        robotState.targetSpeed = calculateEffectiveSpeed(robotState) * 0.3;
+      }
+    } else {
+      robotState.targetSpeed = calculateEffectiveSpeed(robotState) * 0.5;
     }
 
     if ((robotState.weaponCooldown || 0) <= 0) {

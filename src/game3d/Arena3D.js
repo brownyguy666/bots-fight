@@ -595,6 +595,7 @@ export class Arena3D {
 
     // 1. Simulation Clock Update (Fase 24)
     const clockResult = this.simClock.update(deltaMs * this.simSpeed);
+    const ticksToRun = typeof clockResult === 'number' ? clockResult : (clockResult?.ticksToExecute || 0);
 
     // Update indikator UI waktu & tick
     const tickEl = document.getElementById('sim-tick-indicator');
@@ -603,8 +604,8 @@ export class Arena3D {
     if (timeEl) timeEl.textContent = `Waktu: ${this.simClock.formatTime()}`;
 
     // Jalankan satu atau lebih simulation tick jika clock berdetik
-    if (clockResult.ticksToExecute > 0) {
-      for (let t = 0; t < clockResult.ticksToExecute; t++) {
+    if (ticksToRun > 0) {
+      for (let t = 0; t < ticksToRun; t++) {
         this.runSimulationTick();
       }
     }
@@ -643,9 +644,6 @@ export class Arena3D {
 
   // --- SATU FULL SIMULATION TICK (150ms DETERMINISTIK) (Fase 24) ---
   runSimulationTick() {
-    this.simClock.tick += 1;
-    this.simClock.timeMs += this.simClock.tickMs;
-
     // Kurangi waktu match
     this.matchTime -= 0.15;
     if (this.matchTime <= 0) {
@@ -722,6 +720,8 @@ export class Arena3D {
 
   // Debug satu tick manual (Fase 24)
   stepSingleTick() {
+    this.simClock.tick += 1;
+    this.simClock.timeMs += this.simClock.tickMs;
     this.runSimulationTick();
     this.updateRobotsVisual(0.15);
     this.updateProjectiles(0.15);

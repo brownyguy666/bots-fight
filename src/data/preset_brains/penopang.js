@@ -79,9 +79,9 @@ export const PRESET_PENOPANG = {
       },
       {
         id: 8,
-        type: 'RoboArena/Diam',
+        type: 'RoboArena/GerakKeMusuh',
         pos: [780, 330],
-        size: [160, 50],
+        size: [170, 50],
         inputs: [{ name: 'in', type: 'flow', link: 7 }]
       }
     ],

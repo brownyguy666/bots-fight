@@ -52,7 +52,9 @@ export class SimulationClock {
    * @returns {number} Jumlah tick yang siap diproses
    */
   update(deltaMs, timeScale = 1.0) {
-    if (this.isPaused) return 0;
+    if (this.isPaused) {
+      return { ticksToExecute: 0, tick: this.tick, timeMs: this.timeMs, valueOf() { return 0; } };
+    }
 
     this.accumulatedMs += deltaMs * timeScale;
     let ticksToProcess = 0;
@@ -70,7 +72,12 @@ export class SimulationClock {
       this.accumulatedMs = 0; // Buang sisa jika terlalu jauh tertinggal
     }
 
-    return ticksToProcess;
+    return {
+      ticksToExecute: ticksToProcess,
+      tick: this.tick,
+      timeMs: this.timeMs,
+      valueOf() { return ticksToProcess; }
+    };
   }
 
   getTimeSeconds() {

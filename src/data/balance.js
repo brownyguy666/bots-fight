@@ -5,17 +5,17 @@
  */
 
 export const BALANCE = {
-  // Arena
+  // Arena (Skala 3D: 60 x 40 Unit)
   ARENA: {
-    WIDTH: 960,
-    HEIGHT: 640,
+    WIDTH: 60,
+    HEIGHT: 40,
     MATCH_DURATION_SECONDS: 120, // 2 menit
     AI_TICK_MS: 150, // Evaluasi pohon keputusan tiap 150ms
-    BASE_ROBOT_SPEED: 110, // Kecepatan dasar (px/s)
+    BASE_ROBOT_SPEED: 7.0, // Kecepatan dasar (unit arena/s)
     BASE_ROTATION_SPEED: 3.5, // Kecepatan putar dasar (rad/s)
-    ROBOT_RADIUS: 22,
-    DEFAULT_SENSOR_RADIUS: 280, // Radius sensor bawaan jika slot kosong
-    SENSOR_BROKEN_RATIO: 0.15 // Radius menyusut jadi 15% jika sensor rusak (HP = 0)
+    ROBOT_RADIUS: 1.4, // Radius fisik robot (unit arena)
+    DEFAULT_SENSOR_RADIUS: 60.0, // Radius sensor bawaan (mencakup arena 60x40)
+    SENSOR_BROKEN_RATIO: 0.20 // Radius menyusut jadi 20% jika sensor rusak (HP = 0)
   },
 
   // Modul 2 - Damage Model & Anti-RNG

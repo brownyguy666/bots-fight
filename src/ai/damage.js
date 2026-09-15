@@ -31,9 +31,12 @@ export function isArmorDepleted(robotState) {
 
 export function getEffectiveSensorRadius(robotState) {
   const sens = robotState.parts?.sensor;
-  const baseRadius = sens?.radius || BALANCE.ARENA.DEFAULT_SENSOR_RADIUS;
+  let baseRadius = sens?.radius || BALANCE.ARENA.DEFAULT_SENSOR_RADIUS;
+  if (baseRadius > 60) {
+    baseRadius = baseRadius / 16;
+  }
   if (sens && sens.hpMax > 0 && sens.hp <= 0) {
-    return Math.max(40, Math.round(baseRadius * BALANCE.ARENA.SENSOR_BROKEN_RATIO));
+    return Math.max(3.0, baseRadius * BALANCE.ARENA.SENSOR_BROKEN_RATIO);
   }
   return baseRadius;
 }

@@ -59,9 +59,9 @@ export const PRESET_PENJAGA_FORMASI = {
       },
       {
         id: 6,
-        type: 'RoboArena/Diam',
+        type: 'RoboArena/GerakKeMusuh',
         pos: [770, 160],
-        size: [160, 50],
+        size: [170, 50],
         inputs: [{ name: 'in', type: 'flow', link: 5 }]
       }
     ],

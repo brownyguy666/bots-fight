@@ -20,12 +20,17 @@ export function getAllRobots() {
       return [...PRESET_ROBOTS];
     }
 
-    // Pastikan semua 8 preset bawaan selalu tersedia dan tersinkronisasi
+    // Pastikan semua 8 preset bawaan selalu tersedia dan tersinkronisasi ke versi terbaru
     let updated = false;
     PRESET_ROBOTS.forEach(preset => {
-      const exists = parsed.some(r => r.id === preset.id);
-      if (!exists) {
-        parsed.push(preset);
+      const idx = parsed.findIndex(r => r.id === preset.id);
+      if (idx === -1) {
+        parsed.push(JSON.parse(JSON.stringify(preset)));
+        updated = true;
+      } else {
+        // Selalu sinkronkan otak dan loadout preset bawaan ke versi terbaru
+        parsed[idx].brain = JSON.parse(JSON.stringify(preset.brain));
+        parsed[idx].loadout = JSON.parse(JSON.stringify(preset.loadout));
         updated = true;
       }
     });

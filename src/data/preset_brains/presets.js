@@ -125,9 +125,9 @@ export const PRESET_ROBOTS = [
         },
         {
           id: 4,
-          type: 'RoboArena/Diam',
+          type: 'RoboArena/GerakKeMusuh',
           pos: [520, 240],
-          size: [160, 50],
+          size: [170, 50],
           inputs: [{ name: 'in', type: 'flow', link: 3 }]
         }
       ],
@@ -255,9 +255,9 @@ export const PRESET_ROBOTS = [
         },
         {
           id: 4,
-          type: 'RoboArena/Diam',
+          type: 'RoboArena/GerakKeMusuh',
           pos: [520, 230],
-          size: [160, 50],
+          size: [170, 50],
           inputs: [{ name: 'in', type: 'flow', link: 3 }]
         }
       ],
