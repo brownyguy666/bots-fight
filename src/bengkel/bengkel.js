@@ -67,6 +67,16 @@ function setupRobotSelector() {
       }
     };
   }
+
+  const komandanChk = document.getElementById('bengkel-is-komandan-chk');
+  if (komandanChk && currentRobot) {
+    komandanChk.checked = !!currentRobot.isKomandan;
+    komandanChk.onchange = (e) => {
+      if (currentRobot) {
+        currentRobot.isKomandan = e.target.checked;
+      }
+    };
+  }
 }
 
 function renderSlots() {

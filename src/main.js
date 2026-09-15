@@ -1,18 +1,22 @@
 import { initBengkel, refreshBengkel } from './bengkel/bengkel.js';
-import { initEditor, loadCurrentRobotBrain, resizeEditorCanvas } from './editor/editor.js';
+import { initEditor, loadCurrentRobotBrain, resizeEditorCanvas, filterPaletteForMission, loadCustomBrain } from './editor/editor.js';
 import { initTutorial } from './editor/tutorial.js';
 import { TournamentManager } from './turnamen/bracket.js';
 import { Arena3D } from './game3d/Arena3D.js';
 import { QuickTest3D } from './game3d/QuickTest3D.js';
 import { getAllRobots, getActiveRobot, getRobotById } from './data/storage.js';
 import { SFX } from './audio/sfx.js';
+import { MISSIONS, getMissionProgress, markMissionCompleted, evaluateMissionMatch, getAllowedBlocksForMission } from './data/missions.js';
+import { DashboardPanitia } from './panitia/dashboard.js';
 
 // State global aplikasi
 let activeTab = 'bengkel';
 let arenaGame = null;
 let quickTestGame = null;
 let tournamentManager = null;
+let panitiaDashboard = null;
 let currentTournamentMatchCallback = null;
+let activeMission = null;
 let matchTimerInterval = null;
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -38,7 +42,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (tourContainer) {
     tournamentManager = new TournamentManager(tourContainer, {
       onStartMatch: (config) => {
-        // Alihkan ke tab Arena dan jalankan match turnamen
         currentTournamentMatchCallback = config.onFinished;
         switchTab('arena');
         launchArenaMatch(config.teamA, config.teamB, true);
@@ -72,7 +75,7 @@ function setupNavigation() {
   });
 }
 
-function switchTab(target) {
+export function switchTab(target) {
   activeTab = target;
 
   document.querySelectorAll('.tab-btn').forEach(b => {
@@ -91,12 +94,19 @@ function switchTab(target) {
       resizeEditorCanvas();
     });
     setTimeout(resizeEditorCanvas, 100);
+  } else if (target === 'misi') {
+    renderMissionUI();
   } else if (target === 'arena') {
     if (!arenaGame) {
       renderArenaTeamSetup();
     }
   } else if (target === 'turnamen') {
     if (tournamentManager) tournamentManager.init();
+  } else if (target === 'panitia') {
+    const panitiaCont = document.getElementById('panitia-dashboard-container');
+    if (panitiaCont) {
+      panitiaDashboard = new DashboardPanitia(panitiaCont);
+    }
   }
 }
 
@@ -202,7 +212,7 @@ function setupArenaControls() {
     });
   });
 
-  // Sistem Kamera 3D (Fase 12)
+  // Sistem Kamera 3D (Fase 12 & 28)
   const camModeSelect = document.getElementById('arena-camera-mode-select');
   const camTargetSelect = document.getElementById('arena-camera-target-select');
 
@@ -228,21 +238,31 @@ function setupArenaControls() {
   const dbgWeapon = document.getElementById('dbg-break-weapon');
   if (dbgWeapon) {
     dbgWeapon.onclick = () => {
-      if (arenaGame) arenaGame.debugBreakFirstBotWeapon();
+      if (arenaGame && arenaGame.robots[0]) {
+        arenaGame.robots[0].robotState.parts.senjata.hp = 0;
+        SFX.playExplosion();
+      }
     };
   }
 
   const dbgLimp = document.getElementById('dbg-limp');
   if (dbgLimp) {
     dbgLimp.onclick = () => {
-      if (arenaGame) arenaGame.debugLimpFirstBot();
+      if (arenaGame && arenaGame.robots[0]) {
+        const p = arenaGame.robots[0].robotState.parts.penggerak;
+        p.hp = p.hpMax * 0.4;
+        SFX.playHit();
+      }
     };
   }
 
   const dbgParalyze = document.getElementById('dbg-paralyze');
   if (dbgParalyze) {
     dbgParalyze.onclick = () => {
-      if (arenaGame) arenaGame.debugParalyzeFirstBot();
+      if (arenaGame && arenaGame.robots[0]) {
+        arenaGame.robots[0].robotState.parts.penggerak.hp = 0;
+        SFX.playExplosion();
+      }
     };
   }
 }
@@ -289,7 +309,7 @@ function getSelectedTeamRobots(containerId) {
   return robots;
 }
 
-function launchArenaMatch(teamA, teamB, isTournament = false) {
+function launchArenaMatch(teamA, teamB, isTournament = false, missionConfig = null) {
   document.getElementById('arena-setup-panel').style.display = 'none';
   document.getElementById('arena-active-panel').style.display = 'flex';
 
@@ -298,16 +318,57 @@ function launchArenaMatch(teamA, teamB, isTournament = false) {
     arenaGame = null;
   }
 
-  arenaGame = new Arena3D('arena-three-container', { teamA, teamB }, (data) => {
-    showMatchResultModal(data, isTournament);
+  // Baca opsi arena, mode, kualitas, seed
+  const mapSelect = document.getElementById('arena-map-select');
+  const modeSelect = document.getElementById('arena-mode-select');
+  const qualitySelect = document.getElementById('arena-quality-select');
+  const seedInput = document.getElementById('arena-seed-input');
+
+  const selectedMapVal = missionConfig?.arenaPreset || (mapSelect ? mapSelect.value : 'arena_kosong');
+  const selectedMode = missionConfig?.mode || (modeSelect ? modeSelect.value : 'eliminasi');
+  const selectedQuality = qualitySelect ? qualitySelect.value : 'high';
+  const seed = seedInput ? seedInput.value.trim() : 'ROBO-TURNAMEN-01';
+
+  const matchConfig = {
+    teamA,
+    teamB,
+    mode: selectedMode,
+    quality: selectedQuality,
+    seed
+  };
+
+  if (selectedMapVal.startsWith('procedural_')) {
+    matchConfig.procedural = true;
+    matchConfig.proceduralMode = selectedMapVal === 'procedural_tournament' ? 'tournament' : 'casual';
+  } else {
+    matchConfig.arenaId = selectedMapVal;
+  }
+
+  arenaGame = new Arena3D('arena-three-container', matchConfig, (resultData) => {
+    if (activeMission) {
+      // Evaluasi hasil misi (Fase 23)
+      const currentBot = teamA[0];
+      const evalResult = evaluateMissionMatch(activeMission, currentBot.brain, resultData.recordedEvents, resultData.winningTeam);
+      if (evalResult.passed) {
+        markMissionCompleted(activeMission.id);
+        SFX.playVictory();
+        alert(`🎉 LULUS MISI!\n${evalResult.reason}`);
+      } else {
+        alert(`⚠️ MISI BELUM LULUS:\n${evalResult.reason}`);
+      }
+      activeMission = null;
+      filterPaletteForMission(null); // Buka kembali seluruh palet
+    }
+
+    showMatchResultModal(resultData, isTournament);
     if (currentTournamentMatchCallback) {
       const cb = currentTournamentMatchCallback;
       currentTournamentMatchCallback = null;
-      setTimeout(() => cb(data), 1500);
+      setTimeout(() => cb(resultData), 1500);
     }
   });
 
-  // Isi dropdown pilihan target kamera
+  // Pilihan kamera
   const camTargetSelect = document.getElementById('arena-camera-target-select');
   const camModeSelect = document.getElementById('arena-camera-mode-select');
   if (camTargetSelect && arenaGame.robots) {
@@ -326,7 +387,6 @@ function launchArenaMatch(teamA, teamB, isTournament = false) {
     camTargetSelect.style.display = camModeSelect.value === 'cinematic' ? 'none' : 'inline-block';
   }
 
-  // Timer countdown HUD
   startMatchTimerDisplay();
 }
 
@@ -374,18 +434,97 @@ function showMatchResultModal(data, isTournament) {
   const reasonEl = document.getElementById('result-reason');
   const statsList = document.getElementById('result-stats-list');
 
-  titleEl.textContent = data.title;
-  titleEl.style.color = data.title.includes('Biru') ? '#00f0ff' : '#ff3366';
-  reasonEl.textContent = data.reason;
+  const winA = data.winningTeam === 'A';
+  const isDraw = data.winningTeam === 'DRAW';
 
-  statsList.innerHTML = data.robots.map(r => `
-    <div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.06);">
-      <span style="color:${r.team === 'teamA' ? '#38bdf8' : '#fb7185'}; font-weight:700;">
-        ${r.nama} (${r.team === 'teamA' ? 'Tim Biru' : 'Tim Merah'})
-      </span>
-      <span>${r.destroyed ? '💥 HANCUR' : `❤️ Sisa HP: ${Math.round(r.hpRangka)}`}</span>
+  titleEl.textContent = isDraw ? 'HASIL PERTANDINGAN SERI!' : (winA ? 'TIM BIRU MENANG!' : 'TIM MERAH MENANG!');
+  titleEl.style.color = isDraw ? '#f59e0b' : (winA ? '#00f0ff' : '#ff3366');
+  reasonEl.textContent = `Pertandingan berakhir pada tick ${data.ticks || 0}`;
+
+  statsList.innerHTML = `
+    <div style="font-size:13px; color:var(--text-muted); line-height:1.6;">
+      <p>Simulasi berjalan deterministik berbasis Clock 150ms.</p>
+      <p>Hasil resmi telah disimpan ke Papan Peringkat Turnamen.</p>
     </div>
-  `).join('');
+  `;
 
   modal.classList.add('active');
+}
+
+/**
+ * Mode Belajar Berjenjang (Fase 23)
+ */
+function renderMissionUI() {
+  const container = document.getElementById('misi-grid-container');
+  const summaryEl = document.getElementById('misi-progress-summary');
+  if (!container) return;
+
+  const progress = getMissionProgress();
+  const completedCount = progress.completedMissionIds.length;
+  if (summaryEl) summaryEl.textContent = `${completedCount} / ${MISSIONS.length} Misi Selesai`;
+
+  container.innerHTML = MISSIONS.map((m, idx) => {
+    const isCompleted = progress.completedMissionIds.includes(m.id);
+    const isUnlocked = idx === 0 || progress.completedMissionIds.includes(MISSIONS[idx - 1].id);
+
+    return `
+      <div class="misi-card ${isCompleted ? 'completed' : isUnlocked ? 'unlocked' : 'locked'}">
+        <div class="misi-card-header">
+          <span class="misi-number">Misi #${m.nomor}</span>
+          <span class="misi-status-badge">
+            ${isCompleted ? '✅ Selesai' : isUnlocked ? '🔓 Terbuka' : '🔒 Terkunci'}
+          </span>
+        </div>
+        <h3 class="misi-title">${m.judul}</h3>
+        <p class="misi-desc">${m.deskripsi}</p>
+        
+        <div class="misi-reqs">
+          <strong>Konsep Utama:</strong>
+          <span class="misi-tags">${(m.requiredNodes || []).join(', ')}</span>
+        </div>
+
+        <div class="misi-actions">
+          ${isUnlocked ? `
+            <button class="btn btn-primary btn-start-mission" data-mission-id="${m.id}" style="width:100%;">
+              ${m.buggyInitialBrain ? '🛠️ Mulai Tantangan Debug' : '🚀 Kerjakan Misi Ini'}
+            </button>
+          ` : `
+            <button class="btn btn-secondary" disabled style="width:100%;">Selesaikan Misi Sebelumnya</button>
+          `}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Pasang listener tombol mulai misi
+  container.querySelectorAll('.btn-start-mission').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const mId = btn.dataset.missionId;
+      const mission = MISSIONS.find(m => m.id === mId);
+      if (!mission) return;
+
+      activeMission = mission;
+      const mIdx = MISSIONS.indexOf(mission);
+      const allowedBlocks = getAllowedBlocksForMission(mIdx);
+
+      // Batasi palet editor
+      filterPaletteForMission(allowedBlocks);
+
+      // Jika ada buggy initial brain (Misi 8 Debugging)
+      if (mission.buggyInitialBrain) {
+        loadCustomBrain(mission.buggyInitialBrain);
+      }
+
+      // Beri opsi: Langsung simulasi atau rancang di editor dulu
+      const goToEditor = confirm(`Misi "${mission.judul}" diaktifkan!\n\nApakah kamu ingin merancang pohon keputusan di Editor terlebih dahulu?\n(Pilih Batal untuk langsung menguji pertempuran di Arena)`);
+
+      if (goToEditor) {
+        switchTab('editor');
+      } else {
+        switchTab('arena');
+        const playerBot = getActiveRobot();
+        launchArenaMatch([playerBot], [mission.musuhPreset], false, mission);
+      }
+    });
+  });
 }

@@ -2,6 +2,7 @@ import { LiteGraph } from 'litegraph.js';
 
 /**
  * Registrasi Custom Nodes LiteGraph untuk RoboArena
+ * Seluruh node jarak menggunakan Satuan Arena (Arena Units).
  */
 
 export function registerCustomNodes() {
@@ -54,7 +55,7 @@ export function registerCustomNodes() {
   // --- CONDITION NODES DASAR ---
   const MusuhTerlihatNode = createConditionNodeClass(
     '👁️ Musuh Terlihat?',
-    'Cek apakah ada musuh dalam jangkauan sensor'
+    'Cek apakah ada musuh dalam jangkauan sensor dan LOS bebas'
   );
   LiteGraph.registerNodeType('RoboArena/MusuhTerlihat', MusuhTerlihatNode);
 
@@ -66,10 +67,10 @@ export function registerCustomNodes() {
     this.color = '#0284c7';
     this.bgcolor = '#0c4a6e';
     this.boxcolor = '#38bdf8';
-    this.properties = { jarak: 200 };
-    this.addWidget('number', 'Jarak (px)', 200, val => {
+    this.properties = { jarak: 15 };
+    this.addWidget('number', 'Jarak (unit)', 15, val => {
       this.properties.jarak = Number(val);
-    }, { min: 40, max: 600, step: 10 });
+    }, { min: 2, max: 40, step: 1 });
     this.size = [210, 84];
   }
   LiteGraph.registerNodeType('RoboArena/JarakMusuhKurangDari', JarakMusuhKurangDariNode);
@@ -104,10 +105,10 @@ export function registerCustomNodes() {
     this.color = '#0284c7';
     this.bgcolor = '#0c4a6e';
     this.boxcolor = '#38bdf8';
-    this.properties = { jarak: 180 };
-    this.addWidget('number', 'Jarak (px)', 180, val => {
+    this.properties = { jarak: 12 };
+    this.addWidget('number', 'Jarak (unit)', 12, val => {
       this.properties.jarak = Number(val);
-    }, { min: 40, max: 500, step: 10 });
+    }, { min: 2, max: 35, step: 1 });
     this.size = [200, 84];
   }
   LiteGraph.registerNodeType('RoboArena/SekutuDekat', SekutuDekatNode);
@@ -195,6 +196,58 @@ export function registerCustomNodes() {
   }
   LiteGraph.registerNodeType('RoboArena/WaktuHampirHabis', WaktuHampirHabisNode);
 
+  // --- CONDITION NODES MODUL 5 (OBJEKTIF & KOORDINASI TIM) ---
+  const SedangBawaFlagNode = createConditionNodeClass(
+    '🚩 Sedang Bawa Flag?',
+    'Cek apakah robot sedang membawa bendera musuh (CTF)',
+    '#059669', '#064e3b', '#34d399'
+  );
+  LiteGraph.registerNodeType('RoboArena/SedangBawaFlag', SedangBawaFlagNode);
+
+  const FlagMusuhTerlihatNode = createConditionNodeClass(
+    '👁️ Flag Musuh Terlihat?',
+    'Cek apakah bendera lawan terlihat dalam jangkauan sensor & LOS',
+    '#059669', '#064e3b', '#34d399'
+  );
+  LiteGraph.registerNodeType('RoboArena/FlagMusuhTerlihat', FlagMusuhTerlihatNode);
+
+  const DiZonaHillNode = createConditionNodeClass(
+    '⛰️ Di Zona Hill?',
+    'Cek apakah posisi robot berada di dalam zona bukit (KOTH)',
+    '#d97706', '#78350f', '#fcd34d'
+  );
+  LiteGraph.registerNodeType('RoboArena/DiZonaHill', DiZonaHillNode);
+
+  const TimUnggulDiHillNode = createConditionNodeClass(
+    '👑 Tim Unggul di Hill?',
+    'Cek apakah tim memiliki lebih banyak robot di zona bukit daripada musuh',
+    '#d97706', '#78350f', '#fcd34d'
+  );
+  LiteGraph.registerNodeType('RoboArena/TimUnggulDiHill', TimUnggulDiHillNode);
+
+  function SekutuMintaBantuanNode() {
+    this.addInput('in', 'flow');
+    this.addOutput('YA', 'flow');
+    this.addOutput('TIDAK', 'flow');
+    this.title = '🆘 Sekutu Minta Bantuan?';
+    this.color = '#e11d48';
+    this.bgcolor = '#881337';
+    this.boxcolor = '#fb7185';
+    this.properties = { radius: 20 };
+    this.addWidget('number', 'Radius (unit)', 20, val => {
+      this.properties.radius = Number(val);
+    }, { min: 5, max: 45, step: 1 });
+    this.size = [220, 84];
+  }
+  LiteGraph.registerNodeType('RoboArena/SekutuMintaBantuan', SekutuMintaBantuanNode);
+
+  const AdaMusuhPrioritasNode = createConditionNodeClass(
+    '🎯 Ada Musuh Prioritas?',
+    'Cek apakah Komandan menandai musuh prioritas yang masih hidup',
+    '#e11d48', '#881337', '#fb7185'
+  );
+  LiteGraph.registerNodeType('RoboArena/AdaMusuhPrioritas', AdaMusuhPrioritasNode);
+
   // --- ACTION NODES ---
   const GerakKeMusuhNode = createActionNodeClass(
     '⚔️ Gerak ke Musuh',
@@ -226,13 +279,13 @@ export function registerCustomNodes() {
     this.color = '#7e22ce';
     this.bgcolor = '#581c87';
     this.boxcolor = '#c084fc';
-    this.properties = { x: 480, y: 320 };
-    this.addWidget('number', 'X', 480, val => {
+    this.properties = { x: 30, y: 20 };
+    this.addWidget('number', 'X (unit)', 30, val => {
       this.properties.x = Number(val);
-    }, { min: 40, max: 920, step: 20 });
-    this.addWidget('number', 'Y', 320, val => {
+    }, { min: 2, max: 58, step: 1 });
+    this.addWidget('number', 'Y (unit)', 20, val => {
       this.properties.y = Number(val);
-    }, { min: 40, max: 600, step: 20 });
+    }, { min: 2, max: 38, step: 1 });
     this.size = [180, 100];
   }
   LiteGraph.registerNodeType('RoboArena/GerakKeTitik', GerakKeTitikNode);
@@ -259,8 +312,37 @@ export function registerCustomNodes() {
 
   const LindungiSekutuNode = createActionNodeClass(
     '🛡️ Lindungi Sekutu',
-    'Menjadi tameng di depan teman satu tim yang sekarat',
+    'Menjadi tameng di depan teman satu tim yang sekarat atau minta bantuan',
     '#2563eb', '#1e40af', '#60a5fa'
   );
   LiteGraph.registerNodeType('RoboArena/LindungiSekutu', LindungiSekutuNode);
+
+  // --- ACTION NODES MODUL 5 (OBJEKTIF & KOORDINASI TIM) ---
+  const SerangMusuhPrioritasNode = createActionNodeClass(
+    '⚔️ Serang Musuh Prioritas',
+    'Mengejar dan menyerang target prioritas yang ditandai Komandan',
+    '#e11d48', '#881337', '#fb7185'
+  );
+  LiteGraph.registerNodeType('RoboArena/SerangMusuhPrioritas', SerangMusuhPrioritasNode);
+
+  const GerakKeFlagMusuhNode = createActionNodeClass(
+    '🚩 Gerak ke Flag Musuh',
+    'Menuju ke lokasi bendera tim lawan untuk merebutnya (CTF)',
+    '#059669', '#064e3b', '#34d399'
+  );
+  LiteGraph.registerNodeType('RoboArena/GerakKeFlagMusuh', GerakKeFlagMusuhNode);
+
+  const KembaliKeBaseNode = createActionNodeClass(
+    '🏠 Kembali ke Base',
+    'Membawa bendera kembali ke pangkalan sendiri untuk mencetak skor (CTF)',
+    '#059669', '#064e3b', '#34d399'
+  );
+  LiteGraph.registerNodeType('RoboArena/KembaliKeBase', KembaliKeBaseNode);
+
+  const KuasaiHillNode = createActionNodeClass(
+    '⛰️ Kuasai Zona Hill',
+    'Maju dan bertahan di zona bukit tengah (KOTH)',
+    '#d97706', '#78350f', '#fcd34d'
+  );
+  LiteGraph.registerNodeType('RoboArena/KuasaiHill', KuasaiHillNode);
 }

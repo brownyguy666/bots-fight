@@ -1,28 +1,43 @@
 import * as THREE from 'three';
 import { SFX } from '../audio/sfx.js';
+import { checkLineBlockedByObstacles } from './obstacles.js';
 
 /**
- * Proyektil 3D untuk RoboArena Three.js
+ * Proyektil 3D untuk RoboArena Three.js (Fase 20 & 27)
+ * Beroperasi dalam Satuan Arena (Arena Units) dan mendukung collision obstacle serta efek FX spesifik.
  */
 export class Projectile3D {
-  constructor(scene, startPos2D, angle, weaponData, shooter, toWorldCoord) {
+  constructor(scene, startPos2D, angle, weaponData, shooter, toWorldCoord, arenaBounds = { width: 60, height: 40 }) {
     this.scene = scene;
     this.shooter = shooter;
     this.weaponData = weaponData;
-    this.speed = weaponData.projectileSpeed || 380;
+    this.arenaBounds = arenaBounds;
+
+    // Normalisasi kecepatan & jangkauan ke satuan arena jika masih dalam piksel (> 50)
+    let spd = weaponData.projectileSpeed || 380;
+    if (spd > 50) spd = spd / 16;
+    this.speed = spd;
+
+    let rng = weaponData.range || 350;
+    if (rng > 60) rng = rng / 16;
+    this.range = rng;
+
     this.damage = weaponData.damage || 15;
-    this.range = weaponData.range || 400;
     this.distanceTraveled = 0;
     this.isHoming = !!weaponData.homing;
     this.active = true;
     this.toWorldCoord = toWorldCoord;
 
-    // Posisi 2D logika
+    // Posisi 2D logika (Arena Units)
     this.x = startPos2D.x;
     this.y = startPos2D.y;
     this.angle = angle;
     this.vx = Math.cos(angle) * this.speed;
     this.vy = Math.sin(angle) * this.speed;
+
+    // Laser instan beam (Modul 6 Fase 27)
+    this.isInstantBeam = weaponData.jenis === 'laser';
+    this.beamLifetime = 0.15; // Detik
 
     // Buat Mesh 3D sesuai tipe senjata
     this.mesh = this.createMesh(weaponData);
@@ -52,11 +67,20 @@ export class Projectile3D {
         roughness: 0.2
       });
       group.add(new THREE.Mesh(geo, mat));
+
     } else if (jenis === 'laser') {
-      const geo = new THREE.CylinderGeometry(0.1, 0.1, 2.4, 8);
+      // Instant beam visual cylinder spanning length
+      const beamLength = this.range * 1.5;
+      const geo = new THREE.CylinderGeometry(0.12, 0.12, beamLength, 8);
       geo.rotateX(Math.PI / 2);
-      const mat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+      geo.translate(0, 0, beamLength / 2);
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0x00f0ff,
+        transparent: true,
+        opacity: 0.9
+      });
       group.add(new THREE.Mesh(geo, mat));
+
     } else if (jenis === 'rudal') {
       const bodyGeo = new THREE.CylinderGeometry(0.18, 0.18, 1.2, 8);
       bodyGeo.rotateX(Math.PI / 2);
@@ -70,11 +94,13 @@ export class Projectile3D {
       tip.position.z = 0.7;
 
       group.add(body, tip);
+
     } else if (jenis === 'railgun') {
       const geo = new THREE.CylinderGeometry(0.09, 0.09, 3.2, 8);
       geo.rotateX(Math.PI / 2);
       const mat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
       group.add(new THREE.Mesh(geo, mat));
+
     } else if (jenis === 'api') {
       const geo = new THREE.SphereGeometry(0.48, 8, 8);
       const mat = new THREE.MeshStandardMaterial({
@@ -84,6 +110,7 @@ export class Projectile3D {
         roughness: 0.3
       });
       group.add(new THREE.Mesh(geo, mat));
+
     } else if (jenis === 'emp') {
       const geo = new THREE.SphereGeometry(0.42, 10, 10);
       const mat = new THREE.MeshStandardMaterial({
@@ -97,8 +124,9 @@ export class Projectile3D {
       const ring = new THREE.Mesh(ringGeo, ringMat);
       ring.rotation.x = Math.PI / 2;
       group.add(new THREE.Mesh(geo, mat), ring);
+
     } else {
-      // Gatling
+      // Gatling / Beruntun
       const geo = new THREE.CylinderGeometry(0.08, 0.08, 1.0, 6);
       geo.rotateX(Math.PI / 2);
       const mat = new THREE.MeshBasicMaterial({ color: 0xa855f7 });
@@ -108,8 +136,22 @@ export class Projectile3D {
     return group;
   }
 
-  update(deltaSec, aliveEnemies = []) {
+  update(deltaSec, aliveEnemies = [], obstacles = []) {
     if (!this.active) return;
+
+    // Laser beam instan: fade out cepat
+    if (this.isInstantBeam) {
+      this.beamLifetime -= deltaSec;
+      if (this.beamLifetime <= 0) {
+        this.destroy(false);
+      } else {
+        // Fade opacity
+        this.mesh.traverse(c => {
+          if (c.material) c.material.opacity = this.beamLifetime / 0.15;
+        });
+      }
+      return;
+    }
 
     // Homing Steering untuk Rudal
     if (this.isHoming && aliveEnemies.length > 0) {
@@ -138,22 +180,39 @@ export class Projectile3D {
       }
     }
 
-    // Pergerakan 2D
+    const prevX = this.x;
+    const prevY = this.y;
+
+    // Pergerakan
     const stepDist = this.speed * deltaSec;
     this.x += this.vx * deltaSec;
     this.y += this.vy * deltaSec;
     this.distanceTraveled += stepDist;
 
+    // Cek tabrakan obstacle (Fase 20)
+    if (obstacles && obstacles.length > 0) {
+      if (checkLineBlockedByObstacles(prevX, prevY, this.x, this.y, obstacles)) {
+        this.destroy(true);
+        return;
+      }
+    }
+
     this.update3DTransform();
 
-    // Cek batas jangkauan
+    // Cek jangkauan
     if (this.distanceTraveled >= this.range) {
       this.destroy(false);
       return;
     }
 
-    // Cek batas arena (10 - 950, 10 - 630)
-    if (this.x < 10 || this.x > 950 || this.y < 10 || this.y > 630) {
+    // Cek batas arena (Arena Units)
+    const margin = 1.0;
+    if (
+      this.x < margin ||
+      this.x > this.arenaBounds.width - margin ||
+      this.y < margin ||
+      this.y > this.arenaBounds.height - margin
+    ) {
       this.destroy(true);
     }
   }
@@ -172,7 +231,7 @@ export class Projectile3D {
     this.mesh.traverse(child => {
       if (child.isMesh) {
         child.geometry.dispose();
-        child.material.dispose();
+        if (child.material) child.material.dispose();
       }
     });
   }

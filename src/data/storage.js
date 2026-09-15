@@ -70,11 +70,19 @@ export function saveRobot(robot) {
   }
 
   const all = getAllRobots();
-  const id = robot.id || `robot_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+  const id = robot.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `robot_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`);
+
+  // Jika robot ini dijadikan Komandan, lepas status komandan dari robot lain (max 1 komandan per tim)
+  if (robot.isKomandan) {
+    all.forEach(r => {
+      if (r.id !== id) r.isKomandan = false;
+    });
+  }
 
   const cleanRobot = {
     id,
     namaRobot: robot.namaRobot.trim(),
+    isKomandan: !!robot.isKomandan,
     loadout: robot.loadout || {
       rangka: 'sedang',
       penggerak: 'roda',
@@ -83,6 +91,7 @@ export function saveRobot(robot) {
       armor: 'kosong'
     },
     brain: robot.brain || null,
+    createdAt: robot.createdAt || Date.now(),
     updatedAt: Date.now()
   };
 
@@ -208,5 +217,15 @@ export function importRobotJSON(jsonString) {
   } catch (err) {
     console.error('Format berkas robot tidak valid:', err);
     throw new Error('Berkas JSON tidak sesuai format RoboArena.');
+  }
+}
+
+export function getStoredRobots() {
+  return getAllRobots();
+}
+
+export function saveStoredRobots(robots) {
+  if (Array.isArray(robots)) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(robots));
   }
 }

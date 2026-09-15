@@ -145,6 +145,26 @@ function setupPalette() {
       ]
     },
     {
+      title: 'Objektif Arena (Modul 5)',
+      nodes: [
+        { type: 'RoboArena/SedangBawaFlag', label: '🚩 Sedang Bawa Flag?' },
+        { type: 'RoboArena/FlagMusuhTerlihat', label: '👁️ Flag Musuh Terlihat?' },
+        { type: 'RoboArena/DiZonaHill', label: '⛰️ Di Zona Hill?' },
+        { type: 'RoboArena/TimUnggulDiHill', label: '👑 Tim Unggul di Hill?' },
+        { type: 'RoboArena/GerakKeFlagMusuh', label: '🚩 Gerak ke Flag Musuh' },
+        { type: 'RoboArena/KembaliKeBase', label: '🏠 Kembali ke Base' },
+        { type: 'RoboArena/KuasaiHill', label: '⛰️ Kuasai Zona Hill' }
+      ]
+    },
+    {
+      title: 'Koordinasi Tim & Komandan (Modul 5)',
+      nodes: [
+        { type: 'RoboArena/SekutuMintaBantuan', label: '🆘 Sekutu Minta Bantuan?' },
+        { type: 'RoboArena/AdaMusuhPrioritas', label: '🎯 Ada Musuh Prioritas?' },
+        { type: 'RoboArena/SerangMusuhPrioritas', label: '⚔️ Serang Musuh Prioritas' }
+      ]
+    },
+    {
       title: 'Kondisi Taktis (Modul 4)',
       nodes: [
         { type: 'RoboArena/MusuhLumpuh', label: '⚡ Musuh Lumpuh?' },
@@ -401,6 +421,38 @@ function setupToolbar() {
       }
     });
   }
+}
+
+export function filterPaletteForMission(allowedNodeTypes = null) {
+  const paletteEl = document.getElementById('editor-palette-list');
+  if (!paletteEl) return;
+
+  const buttons = paletteEl.querySelectorAll('.palette-item-btn');
+  buttons.forEach(btn => {
+    const nodeType = btn.dataset.type ? btn.dataset.type.replace('RoboArena/', '') : '';
+    if (!allowedNodeTypes || allowedNodeTypes.includes(nodeType) || nodeType === 'Root') {
+      btn.style.display = '';
+      btn.removeAttribute('disabled');
+    } else {
+      btn.style.display = 'none';
+      btn.setAttribute('disabled', 'true');
+    }
+  });
+
+  // Sembunyikan kategori kosong jika seluruh item di dalamnya tersembunyi
+  const categories = paletteEl.querySelectorAll('.palette-category');
+  categories.forEach(cat => {
+    const visibleBtns = cat.querySelectorAll('.palette-item-btn:not([disabled])');
+    cat.style.display = visibleBtns.length > 0 ? '' : 'none';
+  });
+}
+
+export function loadCustomBrain(brainData) {
+  if (!graph || !brainData) return;
+  graph.clear();
+  graph.configure(brainData);
+  ensureRootNode();
+  if (canvas) canvas.draw(true, true);
 }
 
 function showToast(msg) {

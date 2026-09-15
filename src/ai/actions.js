@@ -5,6 +5,7 @@ import { findClosestEnemy } from './sensors.js';
 /**
  * Eksekusi Aksi AI untuk Robot
  * Mengatur target kecepatan, rotasi haluan, dan permintaan tembak robot
+ * Beroperasi sepenuhnya dalam satuan arena (Arena Units).
  */
 
 export function calculateEffectiveSpeed(robotState) {
@@ -28,7 +29,13 @@ export function calculateEffectiveSpeed(robotState) {
     ? BALANCE.LOCOMOTION.SPEED_MULTIPLIERS[locoState]
     : 1.0;
 
-  return baseSpeed * partFactor * locoFactor;
+  // Modifier terrain arena (Fase 20)
+  const terrainFactor = robotState.terrainSpeedModifier !== undefined ? robotState.terrainSpeedModifier : 1.0;
+
+  // Modifier kemiringan tanjakan/turunan (Fase 29)
+  const slopeFactor = robotState.slopeSpeedModifier !== undefined ? robotState.slopeSpeedModifier : 1.0;
+
+  return baseSpeed * partFactor * locoFactor * terrainFactor * slopeFactor;
 }
 
 export function calculateEffectiveTurnSpeed(robotState) {
@@ -65,14 +72,17 @@ export const ACTIONS = {
     robotState.targetSpeed = calculateEffectiveSpeed(robotState);
   },
 
-  // 3. Bergerak ke Titik Tertentu (x, y)
+  // 3. Bergerak ke Titik Tertentu (x, y) dalam Satuan Arena
   GerakKeTitik(robotState, gameState, params = {}) {
-    const tx = params.x !== undefined ? Number(params.x) : BALANCE.ARENA.WIDTH / 2;
-    const ty = params.y !== undefined ? Number(params.y) : BALANCE.ARENA.HEIGHT / 2;
+    let tx = params.x !== undefined ? Number(params.x) : BALANCE.ARENA.WIDTH / 2;
+    let ty = params.y !== undefined ? Number(params.y) : BALANCE.ARENA.HEIGHT / 2;
+    if (tx > 60) tx = tx / 16;
+    if (ty > 40) ty = ty / 16;
+
     const dx = tx - robotState.x;
     const dy = ty - robotState.y;
 
-    if (Math.hypot(dx, dy) < 15) {
+    if (Math.hypot(dx, dy) < 1.5) {
       robotState.targetSpeed = 0;
       return;
     }
@@ -84,7 +94,7 @@ export const ACTIONS = {
   // 4. Diam / Bertahan di Tempat
   Diam(robotState, gameState) {
     robotState.targetSpeed = 0;
-    // Jika ada musuh terlihat, tetap hadapkan turet ke musuh
+    // Jika ada musuh terlihat, tetap hadapkan turet/senjata ke musuh
     const closest = findClosestEnemy(robotState, gameState);
     if (closest) {
       robotState.targetRotation = Math.atan2(closest.dy, closest.dx);
@@ -93,19 +103,16 @@ export const ACTIONS = {
 
   // 5. Tembak
   Tembak(robotState, gameState) {
-    // Validasi apakah senjata rusak (Modul 2)
     if (isWeaponBroken(robotState)) {
-      robotState.brokenWeaponAttempt = true; // Ditangkap oleh RobotHUD
+      robotState.brokenWeaponAttempt = true;
       return;
     }
 
-    // Arahkan ke musuh terdekat sebelum menembak
     const closest = findClosestEnemy(robotState, gameState);
     if (closest) {
       robotState.targetRotation = Math.atan2(closest.dy, closest.dx);
     }
 
-    // Cek cooldown
     if ((robotState.weaponCooldown || 0) <= 0) {
       robotState.fireRequested = true;
       robotState.weaponCooldown = robotState.parts?.senjata?.cooldown || 1.2;
@@ -118,7 +125,7 @@ export const ACTIONS = {
     robotState.isReloading = true;
   },
 
-  // 7. Tabrak Musuh Terdekat (Modul 4)
+  // 7. Tabrak Musuh Terdekat (Body Ramming)
   Tabrak(robotState, gameState) {
     const closest = findClosestEnemy(robotState, gameState);
     if (!closest) {
@@ -130,7 +137,7 @@ export const ACTIONS = {
     robotState.targetSpeed = calculateEffectiveSpeed(robotState) * 1.25;
   },
 
-  // 8. Fokus Musuh Terlemah (Modul 4)
+  // 8. Fokus Musuh Terlemah
   FokusMusuhTerlemah(robotState, gameState) {
     if (!gameState || !gameState.robots) return;
     const enemies = gameState.robots.filter(r => r.team !== robotState.team && !r.destroyed);
@@ -159,7 +166,7 @@ export const ACTIONS = {
     }
   },
 
-  // 9. Lindungi Sekutu (Modul 4)
+  // 9. Lindungi Sekutu (Membela sekutu yang sekarat atau minta bantuan signal)
   LindungiSekutu(robotState, gameState) {
     if (!gameState || !gameState.robots) return;
     const allies = gameState.robots.filter(
@@ -170,21 +177,42 @@ export const ACTIONS = {
       return;
     }
 
-    let weakestAlly = allies[0];
-    let minHP = Infinity;
-    allies.forEach(a => {
-      const hp = a.parts?.rangka?.hp || 0;
-      if (hp < minHP) {
-        minHP = hp;
-        weakestAlly = a;
+    // Prioritas sekutu yang mengirimkan signal minta bantuan
+    let targetAlly = null;
+    if (gameState.signalBus) {
+      const helpSig = gameState.signalBus.findHelpSignal(
+        robotState.team,
+        robotState.id,
+        { x: robotState.x, y: robotState.y },
+        30
+      );
+      if (helpSig) {
+        targetAlly = allies.find(a => a.id === helpSig.sourceRobotId);
       }
-    });
+    }
+
+    // Jika tidak ada signal bantuan, cari sekutu dengan HP terendah
+    if (!targetAlly) {
+      let minHP = Infinity;
+      allies.forEach(a => {
+        const hp = a.parts?.rangka?.hp || 0;
+        if (hp < minHP) {
+          minHP = hp;
+          targetAlly = a;
+        }
+      });
+    }
+
+    if (!targetAlly) {
+      ACTIONS.GerakKeMusuh(robotState, gameState);
+      return;
+    }
 
     const enemies = gameState.robots.filter(r => r.team !== robotState.team && !r.destroyed);
     let nearestEnemyToAlly = null;
     let minEnemyDist = Infinity;
     enemies.forEach(e => {
-      const d = Math.hypot(e.x - weakestAlly.x, e.y - weakestAlly.y);
+      const d = Math.hypot(e.x - targetAlly.x, e.y - targetAlly.y);
       if (d < minEnemyDist) {
         minEnemyDist = d;
         nearestEnemyToAlly = e;
@@ -192,11 +220,12 @@ export const ACTIONS = {
     });
 
     if (nearestEnemyToAlly) {
-      const midX = (weakestAlly.x + nearestEnemyToAlly.x) / 2;
-      const midY = (weakestAlly.y + nearestEnemyToAlly.y) / 2;
+      // Posisikan diri di antara sekutu dan musuh
+      const midX = (targetAlly.x + nearestEnemyToAlly.x) / 2;
+      const midY = (targetAlly.y + nearestEnemyToAlly.y) / 2;
       const dx = midX - robotState.x;
       const dy = midY - robotState.y;
-      if (Math.hypot(dx, dy) > 20) {
+      if (Math.hypot(dx, dy) > 2.0) {
         robotState.targetRotation = Math.atan2(dy, dx);
         robotState.targetSpeed = calculateEffectiveSpeed(robotState);
       } else {
@@ -206,6 +235,102 @@ export const ACTIONS = {
     } else {
       ACTIONS.GerakKeMusuh(robotState, gameState);
     }
+  },
+
+  // 10. Serang Musuh Prioritas (Fase 22)
+  SerangMusuhPrioritas(robotState, gameState) {
+    if (!gameState?.signalBus) {
+      ACTIONS.GerakKeMusuh(robotState, gameState);
+      return;
+    }
+
+    const signal = gameState.signalBus.getPriorityTarget(robotState.team);
+    if (!signal) {
+      ACTIONS.GerakKeMusuh(robotState, gameState);
+      return;
+    }
+
+    const target = gameState.robots?.find(r => r.id === signal.targetRobotId && !r.destroyed);
+    if (!target) {
+      ACTIONS.GerakKeMusuh(robotState, gameState);
+      return;
+    }
+
+    const dx = target.x - robotState.x;
+    const dy = target.y - robotState.y;
+    robotState.targetRotation = Math.atan2(dy, dx);
+    robotState.targetSpeed = calculateEffectiveSpeed(robotState);
+
+    if (!isWeaponBroken(robotState) && (robotState.weaponCooldown || 0) <= 0) {
+      robotState.fireRequested = true;
+      robotState.weaponCooldown = robotState.parts?.senjata?.cooldown || 1.2;
+    }
+  },
+
+  // 11. Bergerak ke Bendera Musuh (Fase 21 CTF)
+  GerakKeFlagMusuh(robotState, gameState) {
+    if (!gameState?.flags) {
+      ACTIONS.GerakKeMusuh(robotState, gameState);
+      return;
+    }
+    const enemyFlag = gameState.flags.find(f => f.teamId !== robotState.team);
+    if (!enemyFlag) {
+      ACTIONS.GerakKeMusuh(robotState, gameState);
+      return;
+    }
+
+    const targetPos = enemyFlag.carrierRobotId
+      ? gameState.robots?.find(r => r.id === enemyFlag.carrierRobotId) || enemyFlag.currentPosition
+      : enemyFlag.currentPosition;
+
+    const dx = targetPos.x - robotState.x;
+    const dy = targetPos.y - robotState.y;
+    robotState.targetRotation = Math.atan2(dy, dx);
+    robotState.targetSpeed = calculateEffectiveSpeed(robotState);
+  },
+
+  // 12. Kembali ke Base Sendiri (Fase 21 CTF)
+  KembaliKeBase(robotState, gameState) {
+    if (!gameState?.arenaMap?.spawnPoints) {
+      robotState.targetSpeed = 0;
+      return;
+    }
+    const spawns = robotState.team === 'A'
+      ? gameState.arenaMap.spawnPoints.teamA
+      : gameState.arenaMap.spawnPoints.teamB;
+
+    const home = spawns && spawns[0] ? spawns[0] : { x: robotState.team === 'A' ? 8 : 52, y: 20 };
+    const dx = home.x - robotState.x;
+    const dy = home.y - robotState.y;
+    if (Math.hypot(dx, dy) < 2.0) {
+      robotState.targetSpeed = 0;
+      return;
+    }
+    robotState.targetRotation = Math.atan2(dy, dx);
+    robotState.targetSpeed = calculateEffectiveSpeed(robotState);
+  },
+
+  // 13. Kuasai Zona Hill (Fase 21 KOTH)
+  KuasaiHill(robotState, gameState) {
+    if (!gameState?.hillZone) {
+      ACTIONS.GerakKeMusuh(robotState, gameState);
+      return;
+    }
+    const hz = gameState.hillZone;
+    const dx = hz.x - robotState.x;
+    const dy = hz.y - robotState.y;
+    const dist = Math.hypot(dx, dy);
+
+    if (dist < (hz.radius || 7) * 0.5) {
+      // Sudah nyaman di dalam hill, jaga posisi dan hadap ke musuh terdekat
+      robotState.targetSpeed = 0;
+      const closest = findClosestEnemy(robotState, gameState);
+      if (closest) {
+        robotState.targetRotation = Math.atan2(closest.dy, closest.dx);
+      }
+    } else {
+      robotState.targetRotation = Math.atan2(dy, dx);
+      robotState.targetSpeed = calculateEffectiveSpeed(robotState);
+    }
   }
 };
-

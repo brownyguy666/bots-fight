@@ -22,11 +22,17 @@
       <button class="tab-btn" data-tab="editor">
         <span>🧠</span> Editor Otak
       </button>
+      <button class="tab-btn" data-tab="misi">
+        <span>🎓</span> Mode Belajar
+      </button>
       <button class="tab-btn" data-tab="arena">
         <span>⚔️</span> Arena Simulasi
       </button>
       <button class="tab-btn" data-tab="turnamen">
         <span>🏆</span> Turnamen (Nobar)
+      </button>
+      <button class="tab-btn" data-tab="panitia">
+        <span>📊</span> Panitia & Guru
       </button>
     </nav>
 
@@ -50,8 +56,14 @@
             <span class="bengkel-card-title">PROFIL ROBOT</span>
             <select id="bengkel-select-robot" class="toolbar-select"></select>
           </div>
-          <div style="margin-bottom: 12px;">
+          <div style="margin-bottom: 8px;">
             <input type="text" id="bengkel-robot-name-input" class="toolbar-select" style="width: 100%; font-size: 16px; font-weight: 700;" />
+          </div>
+          <div style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+            <label style="cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--neon-amber); font-weight: 700;">
+              <input type="checkbox" id="bengkel-is-komandan-chk" />
+              👑 Jadikan Komandan Tim (Fase 22)
+            </label>
           </div>
           <div class="preview-canvas-wrapper" id="bengkel-preview-wrapper" style="width: 100%; height: 280px; position: relative;">
           </div>
@@ -176,6 +188,43 @@
           </div>
         </div>
 
+        <!-- Opsi Modul 5 & 6: Arena, Mode, Kualitas, Seed -->
+        <div style="display: flex; flex-wrap: wrap; gap: 12px; margin: 14px 0; background: rgba(15, 23, 42, 0.6); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <label style="font-size: 12px; font-weight: 700; color: var(--neon-cyan);">🗺️ Peta Arena:</label>
+            <select id="arena-map-select" class="toolbar-select">
+              <option value="arena_kosong" selected>Arena Terbuka (Kosong)</option>
+              <option value="arena_berbatu">Arena Berbatu (Rintangan)</option>
+              <option value="arena_berpasir">Gurun Berpasir (Terrain)</option>
+              <option value="procedural_tournament">Prosedural Turnamen (Simetris)</option>
+              <option value="procedural_casual">Prosedural Kasual (Organik)</option>
+            </select>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <label style="font-size: 12px; font-weight: 700; color: var(--neon-amber);">🎯 Mode Permainan:</label>
+            <select id="arena-mode-select" class="toolbar-select">
+              <option value="eliminasi" selected>⚔️ Eliminasi (Default)</option>
+              <option value="ctf">🚩 Capture The Flag (CTF)</option>
+              <option value="koth">⛰️ King of The Hill (KOTH)</option>
+            </select>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <label style="font-size: 12px; font-weight: 700; color: var(--text-muted);">✨ Kualitas Grafis:</label>
+            <select id="arena-quality-select" class="toolbar-select">
+              <option value="high" selected>Tinggi (Shadow & FX)</option>
+              <option value="medium">Sedang</option>
+              <option value="low">Rendah (Sekolah)</option>
+            </select>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <label style="font-size: 12px; font-weight: 700; color: var(--text-muted);">🎲 Seed Turnamen:</label>
+            <input type="text" id="arena-seed-input" value="ROBO-TURNAMEN-01" class="toolbar-select" style="width: 150px;" placeholder="Seed Arena" />
+          </div>
+        </div>
+
         <div class="teams-setup-grid">
           <!-- Tim A (Biru) -->
           <div class="team-box team-a">
@@ -240,9 +289,37 @@
     </div>
   </main>
 
-  <!-- TAB 4: TURNAMEN (BRACKET NOBAR) -->
+  <!-- TAB 4: MODE BELAJAR BERJENJANG (FASE 23) -->
+  <main id="panel-misi" class="tab-panel">
+    <div class="misi-layout">
+      <div class="misi-header-card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h2 style="font-family: var(--font-display); font-size: 20px; color: var(--neon-cyan);">🎓 KURIKULUM MODE BELAJAR (8 MISI)</h2>
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">
+              Pelajari konsep pemrograman AI robot selangkah demi selangkah. Kemenangan dinilai berdasarkan pemahaman dan penggunaan konsep logika!
+            </p>
+          </div>
+          <div class="misi-progress-badge" id="misi-progress-summary">
+            0 / 8 Misi Selesai
+          </div>
+        </div>
+      </div>
+
+      <div class="misi-grid" id="misi-grid-container">
+        <!-- Diisi secara dinamis via JS -->
+      </div>
+    </div>
+  </main>
+
+  <!-- TAB 5: TURNAMEN (BRACKET NOBAR) -->
   <main id="panel-turnamen" class="tab-panel">
     <div id="tournament-container"></div>
+  </main>
+
+  <!-- TAB 6: DASHBOARD PANITIA & GURU (FASE 25) -->
+  <main id="panel-panitia" class="tab-panel">
+    <div id="panitia-dashboard-container"></div>
   </main>
 
   <!-- MODAL HASIL PERTANDINGAN -->

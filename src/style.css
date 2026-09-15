@@ -1337,3 +1337,425 @@ body {
   0% { opacity: 0.5; }
   100% { opacity: 1.0; }
 }
+
+/* ==========================================
+   MODUL 5 & MODUL 6 STYLES
+   ========================================== */
+
+/* --- SIMULATION CONTROLS BAR (FASE 24 & 28) --- */
+.arena-sim-controls-bar {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 8px 14px;
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.sim-clock-group, .sim-camera-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sim-badge {
+  font-family: var(--font-display);
+  font-size: 11px;
+  color: var(--neon-cyan);
+  background: rgba(0, 240, 255, 0.1);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.sim-objective-group {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--neon-amber);
+}
+
+.arena-diag-overlay {
+  position: absolute;
+  bottom: 12px;
+  left: 14px;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--neon-emerald);
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* --- MODE BELAJAR BERJENJANG (FASE 23) --- */
+.misi-layout {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.misi-header-card {
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+}
+
+.misi-progress-badge {
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: var(--neon-cyan);
+  background: rgba(0, 240, 255, 0.12);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  padding: 8px 16px;
+  border-radius: 8px;
+}
+
+.misi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 18px;
+}
+
+.misi-card {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: all 0.2s ease;
+}
+
+.misi-card.completed {
+  border-color: var(--neon-emerald);
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.15);
+}
+
+.misi-card.unlocked {
+  border-color: var(--neon-cyan);
+}
+
+.misi-card.locked {
+  opacity: 0.55;
+  filter: grayscale(0.6);
+}
+
+.misi-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.misi-number {
+  font-family: var(--font-display);
+  font-size: 11px;
+  color: var(--neon-amber);
+}
+
+.misi-status-badge {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.misi-title {
+  font-family: var(--font-ui);
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-main);
+  margin-bottom: 8px;
+}
+
+.misi-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+.misi-reqs {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: rgba(0, 0, 0, 0.25);
+  padding: 8px;
+  border-radius: 6px;
+  margin-bottom: 14px;
+}
+
+.misi-tags {
+  color: var(--neon-cyan);
+  font-weight: 700;
+}
+
+/* --- DASHBOARD PANITIA & GURU (FASE 25) --- */
+.panitia-dashboard {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.panitia-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 12px;
+}
+
+.panitia-card {
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.panitia-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.panitia-card-header h3 {
+  font-family: var(--font-display);
+  font-size: 20px;
+  color: var(--neon-cyan);
+}
+
+.desc-text {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 18px;
+}
+
+.panitia-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.panitia-table th, .panitia-table td {
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.panitia-table th {
+  background: rgba(15, 23, 42, 0.9);
+  color: var(--neon-cyan);
+  font-family: var(--font-display);
+  font-size: 12px;
+}
+
+.rank-gold td { background: rgba(255, 215, 0, 0.08); }
+.rank-silver td { background: rgba(192, 192, 192, 0.08); }
+.rank-bronze td { background: rgba(205, 127, 50, 0.08); }
+
+.rank-badge {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.badge-rate {
+  background: rgba(0, 240, 255, 0.15);
+  color: var(--neon-cyan);
+}
+
+/* Matchup Generator */
+.matchup-controls {
+  margin-bottom: 20px;
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.robot-checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.robot-chk-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.match-pair-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.match-pair-card {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.match-badge {
+  font-family: var(--font-display);
+  font-size: 11px;
+  color: var(--neon-amber);
+  margin-bottom: 8px;
+}
+
+.pair-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.team-tag {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.tag-blue { background: rgba(0, 240, 255, 0.2); color: #38bdf8; }
+.tag-red { background: rgba(255, 51, 102, 0.2); color: #fb7185; }
+
+.vs-divider {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--text-muted);
+  text-align: center;
+  margin: 6px 0;
+}
+
+/* Class Timer */
+.timer-display-wrapper {
+  text-align: center;
+  padding: 30px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 16px;
+  border: 1px solid var(--border-subtle);
+}
+
+.timer-large-digits {
+  font-family: var(--font-display);
+  font-size: 72px;
+  font-weight: 900;
+  color: var(--neon-amber);
+  text-shadow: 0 0 30px rgba(255, 170, 0, 0.4);
+  margin-bottom: 20px;
+}
+
+.timer-action-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.timer-presets {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Robot Card Print Layout */
+.cards-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.robot-id-card {
+  background: #0f172a;
+  border: 2px solid #334155;
+  border-radius: 10px;
+  padding: 16px;
+  color: #f8fafc;
+}
+
+.bot-card-id {
+  font-family: monospace;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.card-title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  color: #38bdf8;
+  margin: 8px 0;
+}
+
+.card-loadout {
+  font-size: 12px;
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
+
+.card-brain-summary {
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 6px;
+  border-radius: 4px;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .printable-area, .printable-area * {
+    visibility: visible;
+  }
+  .printable-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  .robot-id-card {
+    page-break-inside: avoid;
+    border: 2px solid #000;
+    color: #000;
+    background: #fff;
+  }
+}
+
+.panitia-actions-row {
+  display: flex;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.backup-status-area {
+  margin-top: 14px;
+  font-size: 13px;
+}
+
